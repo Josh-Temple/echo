@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ECHO — 2.5D lighting study</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;background:#090e10;color:#b6c1bf;font:14px system-ui,sans-serif}main{max-width:1200px;margin:auto;padding:12px}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}h1{font-size:22px;letter-spacing:.4em;font-weight:400;margin:0}small{font:10px monospace;letter-spacing:.12em;color:#80908c}
+#stage{position:relative;aspect-ratio:16/9;background:#11191c;overflow:hidden;touch-action:none;border:1px solid #2c393b}#stage canvas{width:100%;height:100%;display:block}
+#status{position:absolute;top:15px;left:15px;font:10px monospace;letter-spacing:.13em;color:#c1ccc2aa;pointer-events:none}
+#message{position:absolute;left:50%;top:43%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;letter-spacing:.15em;color:#d1d6d1;font-size:15px;text-shadow:0 2px 14px #000;opacity:0;transition:opacity .5s}#message.show{opacity:1}
+#fallback{position:absolute;inset:0;background:#101719;display:none;place-items:center;padding:25px;text-align:center;line-height:1.8}
+.controls{display:flex;justify-content:space-between;gap:10px;margin-top:12px}.group{display:flex;gap:8px}button{background:#263335;color:#dae0d8;border:1px solid #5a6868;min-width:65px;min-height:55px;padding:10px 15px;touch-action:none;border-radius:3px;user-select:none}button:active,.active{background:#526364}.note{font-size:12px;line-height:1.8;color:#92a19d;margin-top:12px}
+@media(max-width:620px){main{padding:6px}header{padding:6px}small{font-size:8px}#stage{aspect-ratio:16/10}.controls button{min-width:58px;min-height:61px}#status{font-size:8px}}
+</style></head>
+<body><main><header><h1>ECHO</h1><small>SCENE 01 / WEBGL 2.5D STUDY</small></header>
+<div id="stage" aria-label="WebGLで描画する工業施設の3Dシーン"><div id="status">SECTOR 03 — LIGHTING TEST</div><div id="message" role="status"></div><div id="fallback" role="alert"></div></div>
+<div class="controls"><div class="group"><button data-key="left" aria-label="左に移動">◀</button><button data-key="right" aria-label="右に移動">▶</button></div><div class="group"><button data-key="jump">跳ぶ</button><button data-key="use">調べる</button><button id="quality">画質: 自動</button></div></div>
+<div class="note">A/D・←→：歩行　Space：ジャンプ　E：調べる。横移動だけを許可した3D空間です。現行Canvas版は変更しません。Three.jsをCDNから読み込むため初回表示には通信が必要です。</div>
+</main>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+const stage=document.querySelector('#stage'), status=document.querySelector('#status'), msg=document.querySelector('#message'), fallback=document.querySelector('#fallback');
+const keys={left:false,right:false,jump:false,use:false};
+let renderer;
+try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});}
+catch(e){fallback.style.display='grid';fallback.textContent='この端末ではWebGLを開始できませんでした。'+e.message;throw e;}
+stage.insertBefore(renderer.domElement,stage.firstChild);
+renderer.setClearColor(0x111b1e);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.88;
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x131d21);scene.fog=new THREE.FogExp2(0x182225,.035);
+const camera=new THREE.OrthographicCamera(-10,10,5.625,-5.625,.1,180);
+const ambience=new THREE.HemisphereLight(0x7d9da9,0x1b1a18,.59);scene.add(ambience);
+const keyLight=new THREE.DirectionalLight(0xc7d5ca,1.65);keyLight.position.set(15,15,9);keyLight.castShadow=true;keyLight.shadow.mapSize.set(1024,1024);keyLight.shadow.camera.left=-18;keyLight.shadow.camera.right=18;keyLight.shadow.camera.top=13;keyLight.shadow.camera.bottom=-13;keyLight.shadow.bias=-.0003;scene.add(keyLight,keyLight.target);
+const fill=new THREE.PointLight(0x748f93,24,24,2);fill.position.set(9,7,3);scene.add(fill);
+const red=new THREE.PointLight(0xc44c40,35,11,2);red.position.set(30,7,-2);scene.add(red);
+const mat=(color,roughness=1,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness});
+const concrete=mat(0x394548),steel=mat(0x28363b,.78,.65),deep=mat(0x162529),floorMat=mat(0x303b3d,.95,.05),figureMat=mat(0x191d20,.96),coatMat=mat(0x283034),skin=mat(0x6b6c67),redMat=new THREE.MeshStandardMaterial({color:0x962f2a,emissive:0x6d1510,emissiveIntensity:1.4});
+function box(w,h,d,x,y,z,m,parent=scene){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.receiveShadow=true;o.castShadow=true;parent.add(o);return o;}
+function cylinder(radius,height,x,y,z,m,parent=scene){const o=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,height,10),m);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;}
+const worldLength=115;
+box(worldLength,12,.8,55,6,-7,deep);
+box(worldLength,1.1,12,55,11,-1,concrete);
+for(let i=0;i<16;i++){const x=i*7.6-5;
+box(.65,11,3,x,5.5,-5.6,steel);box(6.2,.55,2,x+3.4,8.9,-5.65,concrete);
+box(.35,9,.4,x,5,-4,steel);box(4,.24,.6,x+2,7.5,-4,steel);
+box(.14,4,.14,x+.8,5,-3.25,steel);box(.14,4,.14,x+1.35,5,-3.25,steel);
+if(i%3===0){box(2.2,2.7,.4,x+3.5,3,-6.45,mat(0x141f24));box(.15,2.5,.7,x+2.35,3,-6,steel);}
+}
+const walkSegments=[[-12,32],[34,68],[71,113]];
+for(const [a,b] of walkSegments){box(b-a,.65,6,(a+b)/2,-.35,1,floorMat);box(b-a,.3,.3,(a+b)/2,.08,4,steel);}
+for(let x=0;x<112;x+=2.4){if(walkSegments.some(([a,b])=>x>a&&x<b)){box(.08,.015,4,x,.025,1,mat(0x455052));}}
+for(let i=0;i<12;i++){const x=i*9.2+2;box(.16,5,.12,x,4,-2.5,steel);box(2,.13,.5,x,6.5,-2.5,steel);
+const lamp=box(1.2,.12,.8,x,6.2,-2.4,mat(0xa7c4c0));lamp.material.emissive=new THREE.Color(0x779391);lamp.material.emissiveIntensity=.9;}
+for(let i=0;i<6;i++){const x=i*18+8;for(let k=0;k<3;k++)cylinder(.12,8.5,x+k*.5,5.8,-4,steel);}
+box(3.6,6,.3,101,3,-6.3,steel);box(2.1,4.7,.35,101,2.7,-5.92,mat(0x10191b));
+box(.5,.7,.2,102,3.1,-5.55,redMat);red.position.set(102,5,-2);
+const character=new THREE.Group();scene.add(character);
+const torso=box(.64,1.27,.38,0,2.05,0,coatMat,character);
+const hips=box(.53,.34,.36,0,1.38,0,figureMat,character);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.255,16,10),skin);head.position.set(.03,3.07,0);head.scale.set(.92,1.12,.9);head.castShadow=true;character.add(head);
+const neck=box(.16,.13,.16,0,2.8,0,figureMat,character);
+function limb(x,y,z,w,h,m,parent){const pivot=new THREE.Group();pivot.position.set(x,y,z);parent.add(pivot);const mesh=box(w,h,w*.8,0,-h*.5,0,m,pivot);return pivot;}
+const lLeg=limb(-.19,1.35,0,.22,.75,figureMat,character),rLeg=limb(.19,1.35,0,.22,.75,figureMat,character);
+const lShin=limb(0,-.75,0,.18,.68,figureMat,lLeg),rShin=limb(0,-.75,0,.18,.68,figureMat,rLeg);
+const lArm=limb(-.37,2.57,.02,.19,.83,coatMat,character),rArm=limb(.37,2.57,.02,.19,.83,coatMat,character);
+const gun=new THREE.Group();character.add(gun);box(.76,.23,.23,.3,1.73,.23,steel,gun);box(.23,.47,.18,.01,1.49,.23,figureMat,gun);
+const fogParticles=[];const hazeMat=new THREE.MeshBasicMaterial({color:0x84999a,transparent:true,opacity:.055,depthWrite:false});
+for(let i=0;i<85;i++){const p=new THREE.Mesh(new THREE.PlaneGeometry(.35+Math.random()*.9,.15+Math.random()*.5),hazeMat);p.position.set(Math.random()*115,1+Math.random()*8,-2+Math.random()*5);p.rotation.z=Math.random()*6;scene.add(p);fogParticles.push(p);}
+const state={x:2,y:0,vy:0,vx:0,grounded:true,face:1,phase:0,prevJump:false,ended:false};
+let elapsed=0,last=0,quality=0;
+function groundAt(x){return walkSegments.some(([a,b])=>x>a+.14&&x<b-.14);}
+function reset(){state.x=2;state.y=0;state.vx=0;state.vy=0;state.ended=false;msg.classList.remove('show');}
+function notify(t){msg.textContent=t;msg.classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>msg.classList.remove('show'),2300);}
+function update(dt){
+const s=state;if(s.ended)return;
+const direction=Number(keys.right)-Number(keys.left);
+const target=direction*3.3,step=(direction?8.2:11.5)*dt;
+s.vx+=THREE.MathUtils.clamp(target-s.vx,-step,step);
+if(s.grounded&&keys.jump&&!s.prevJump){s.vy=6.6;s.grounded=false;}s.prevJump=keys.jump;
+s.x=THREE.MathUtils.clamp(s.x+s.vx*dt,0,112);
+const onFloor=groundAt(s.x);
+if(!s.grounded||!onFloor){s.vy-=17*dt;s.y+=s.vy*dt;if(onFloor&&s.y<=0&&s.vy<0){s.y=0;s.vy=0;s.grounded=true;}}
+if(s.grounded&&!onFloor){s.grounded=false;s.vy=0;}
+if(s.y< -7){reset();notify('THE CORRIDOR REMEMBERS');}
+if(Math.abs(s.vx)>.15)s.face=Math.sign(s.vx);
+if(keys.use&&Math.abs(s.x-101)<2){s.ended=true;notify('THERE IS NO ONE ON THE OTHER SIDE');}
+s.phase+=Math.abs(s.vx)*dt*3.3;character.position.set(s.x,s.y,.95);character.rotation.y=s.face===1?0:Math.PI;
+const stride=s.grounded?Math.min(Math.abs(s.vx)/3.3,1):0;
+lLeg.rotation.z=Math.sin(s.phase)*.56*stride;rLeg.rotation.z=-Math.sin(s.phase)*.56*stride;
+lShin.rotation.z=s.grounded?Math.max(0,Math.sin(s.phase+1.4))*.38*stride:-.33;
+rShin.rotation.z=s.grounded?Math.max(0,Math.sin(s.phase+1.4+Math.PI))*.38*stride:-.33;
+lArm.rotation.z=-Math.sin(s.phase)*.28*stride-.07;rArm.rotation.z=Math.sin(s.phase)*.24*stride+.14;
+torso.rotation.z=s.grounded?-s.vx*.015:-s.vx*.023;head.rotation.z=-torso.rotation.z*.5;
+if(!s.grounded){lLeg.rotation.z=.22;rLeg.rotation.z=-.42;lShin.rotation.z=-.5;rShin.rotation.z=.4;}
+gun.rotation.y=character.rotation.y;
+const desired=s.x+6;camera.position.x+=((desired)-camera.position.x)*Math.min(1,dt*2.1);
+camera.position.y+=((5.2+s.y*.15)-camera.position.y)*Math.min(1,dt*1.2);
+camera.lookAt(camera.position.x,3.4+s.y*.10,0);
+keyLight.position.x=camera.position.x+5;keyLight.target.position.x=camera.position.x;keyLight.target.updateMatrixWorld();
+fill.position.x=s.x+3;
+for(const p of fogParticles){p.position.x+=dt*.13;if(p.position.x>112)p.position.x=0;}
+status.textContent='SECTOR 03 / '+Math.round(s.x).toString().padStart(3,'0')+' M / '+(s.grounded?'GROUND':'AIR');
+}
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,quality===2?1:quality===1?1.75:1.35));renderer.setSize(w,h,false);const aspect=w/h;camera.left=-5.7*aspect;camera.right=5.7*aspect;camera.top=5.7;camera.bottom=-5.7;camera.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(stage);resize();
+const codeMap={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',Space:'jump',KeyE:'use'};
+window.addEventListener('keydown',e=>{const k=codeMap[e.code];if(k){e.preventDefault();keys[k]=true;}});
+window.addEventListener('keyup',e=>{const k=codeMap[e.code];if(k){e.preventDefault();keys[k]=false;}});
+window.addEventListener('blur',()=>Object.keys(keys).forEach(k=>keys[k]=false));
+document.querySelectorAll('[data-key]').forEach(b=>{const k=b.dataset.key;const set=v=>{keys[k]=v;b.classList.toggle('active',v);};b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);set(true);});for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>set(false));});
+document.querySelector('#quality').addEventListener('click',()=>{quality=(quality+1)%3;document.querySelector('#quality').textContent=['画質: 自動','画質: 高','画質: 軽量'][quality];resize();});
+let frames=0,framesSince=0;
+function frame(now){requestAnimationFrame(frame);if(!last)last=now;const dt=Math.min((now-last)/1000,.05);last=now;update(dt);renderer.render(scene,camera);frames++;framesSince+=dt;if(framesSince>=2){const fps=frames/framesSince;if(fps<24&&quality===0){quality=2;resize();}frames=0;framesSince=0;}}
+camera.position.set(6,5.2,18);requestAnimationFrame(frame);
+</script></body></html>
