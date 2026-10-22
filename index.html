@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#1b2022">
+<title>ECHO — quiet industrial movement study</title>
+<style>
+:root{color-scheme:dark;--paper:#c7cac4;--dim:#919b99;--edge:#445053}*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#111719;color:var(--paper);font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif}
+body{background:radial-gradient(ellipse at 60% 2%,#384143,#111719 68%)}
+main{width:min(1240px,100%);margin:0 auto;padding:18px clamp(8px,2vw,26px) 22px}
+header{display:flex;justify-content:space-between;align-items:end;gap:14px;margin:0 0 12px}h1{font-size:clamp(22px,4vw,37px);font-weight:400;letter-spacing:.36em;margin:0}header small{display:block;color:#899392;font-size:10px;letter-spacing:.2em;margin-top:5px}.edition{font:10px ui-monospace,monospace;letter-spacing:.11em;color:#85918f;text-align:right}
+.stage{position:relative;aspect-ratio:16/9;overflow:hidden;background:#252e32;border:1px solid #374145;box-shadow:0 22px 70px #0009}.stage:fullscreen{width:100vw;height:100vh;aspect-ratio:auto;border:0}.stage:fullscreen canvas{width:100%;height:100%;object-fit:contain}canvas{display:block;width:100%;height:100%;touch-action:none}.stage::after{position:absolute;inset:0;content:"";pointer-events:none;box-shadow:inset 0 0 70px #10171877}
+.hud{position:absolute;left:20px;top:19px;font:10px ui-monospace,monospace;letter-spacing:.16em;color:#b9c3ba8c;pointer-events:none}.overlay{position:absolute;inset:0;background:#151c1ee8;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:5;text-align:center;padding:20px}.overlay.on{display:flex}.overlay h2{font-weight:400;letter-spacing:.12em;margin:0}.overlay p{font-size:13px;color:#afb6b1;line-height:1.9;margin:0}
+button{font:inherit;touch-action:none;-webkit-tap-highlight-color:transparent;cursor:pointer}.actions{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:13px}.note{font-size:12px;color:#a5b0ae;line-height:1.7;max-width:70%}.note strong{color:#d2d5cc;font-weight:500}.pad{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid #394648}.cluster{display:flex;gap:8px}.key{min-width:78px;min-height:58px;border:1px solid #526164;background:#293336;color:#e0e0d8;font-size:14px;font-weight:500;border-radius:2px;user-select:none}.key.pressed{background:#556160;transform:translateY(1px)}.key.action{border-color:#74605c;background:#423c3c;min-width:108px}
+button.secondary{border:1px solid #536164;background:#252e30;color:#bcc7c3;padding:10px 12px;font-size:11px;letter-spacing:.07em}.lower{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#808e8a;font-size:11px;line-height:1.7;margin-top:11px}.lower .quiet{color:#8f6a66}
+@media(max-width:640px){main{padding:9px 7px 19px}header{margin-bottom:9px}header small,.edition{font-size:8px}.hud{top:11px;left:11px;font-size:8px}.note{font-size:10px;max-width:none}.actions{margin-top:10px}.key{min-width:62px;min-height:64px}.key.action{min-width:88px}.lower{font-size:10px;flex-wrap:wrap}}
+@media(max-width:360px){.key{min-width:55px}.key.action{min-width:76px}}
+</style>
+</head>
+<body><main>
+<header><div><h1>ECHO</h1><small>AN INTERACTIVE STUDY IN SILENCE</small></div><div class="edition">SCENE 01 / THE EMPTY WORKS<br>2D • BROWSER • NO BUILD</div></header>
+<div class="stage" id="stage"><canvas id="game" width="960" height="540" aria-label="孤独な工業施設を進む横スクロール試作"></canvas><div class="hud" id="hud">SECTOR 03 / NO SIGNAL</div><div class="overlay" id="overlay"><h2>静寂の向こう</h2><p>歩く音だけが残る。<br>短いシーンの終わりです。</p><button class="secondary" id="again">もう一度歩く</button></div></div>
+<div class="actions"><div class="note"><strong>歩く。跳ぶ。音を聴く。</strong> いったん跳ぶと、空中で方向を変えることはできません。</div><div style="display:flex;gap:7px"><button class="secondary" id="sound" aria-pressed="true">音: ON</button><button class="secondary" id="full">全画面</button></div></div>
+<div class="pad"><div class="cluster"><button class="key" data-hold="left" aria-label="左へ移動">◀</button><button class="key" data-hold="right" aria-label="右へ移動">▶</button></div><div class="cluster"><button class="key" data-hold="jump" aria-label="ジャンプ">↑ 跳ぶ</button><button class="key action" data-hold="use" aria-label="扉を調べる">調べる</button></div></div>
+<div class="lower"><span><span class="quiet">KEYS</span> A/D・←→ 移動 / SPACE ジャンプ / E 調べる</span><span>霧 / 足音 / 風 / 大きな拳銃 / 赤い灯り</span></div>
+</main>
+<script>
+(()=>{'use strict';
+const c=document.getElementById('game'),g=c.getContext('2d',{alpha:false}),W=960,H=540;
+const stage=document.getElementById('stage'),overlay=document.getElementById('overlay'),hud=document.getElementById('hud');
+const platforms=[{x:-250,w:1110,y:438},{x:987,w:640,y:443},{x:1755,w:800,y:440},{x:2660,w:740,y:442}];
+const END=3165,WORLD=3370,keys={left:false,right:false,jump:false,use:false},clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const grav=1220,walk=235,acc=760,brake=980,jump=-480;
+let p,cam=0,time=0,prev=0,buffer=0,finished=false,mist=[],audio=null,soundOn=true,lastStep=0;
+function reset(){p={x:130,y:438,vx:0,vy:0,on:true,facing:1,stride:0,shock:0,prep:0,jumpQueue:0,coyote:.09,lastFoot:-1,breath:0};cam=0;time=0;buffer=0;finished=false;lastStep=0;overlay.classList.remove('on');hud.textContent='SECTOR 03 / NO SIGNAL';}
+reset();
+function fill(x,y,w,h,color){g.fillStyle=color;g.fillRect(x,y,w,h)}
+function poly(points,color){g.fillStyle=color;g.beginPath();g.moveTo(...points[0]);for(let i=1;i<points.length;i++)g.lineTo(...points[i]);g.closePath();g.fill()}
+function stroke(points,color,width=2){g.lineJoin='round';g.lineCap='round';g.lineWidth=width;g.strokeStyle=color;g.beginPath();g.moveTo(...points[0]);for(let i=1;i<points.length;i++)g.lineTo(...points[i]);g.stroke()}
+function grad(y1,y2,stops){let a=g.createLinearGradient(0,y1,0,y2);for(const [p,c] of stops)a.addColorStop(p,c);return a}
+function glow(x,y,r,color){let q=g.createRadialGradient(x,y,2,x,y,r);q.addColorStop(0,color);q.addColorStop(1,'#0000');g.fillStyle=q;g.fillRect(x-r,y-r,r*2,r*2)}
+function surface(x){return platforms.find(s=>x>=s.x+3&&x<=s.x+s.w-3)||null}
+// Audio is synthesized locally. It starts only after a real keyboard/touch gesture.
+function unlock(){if(!soundOn)return;try{if(!audio){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;audio=new AC();}if(audio.state==='suspended')audio.resume().catch(()=>{});}catch(e){}}
+function noise(duration,highpass,freq,volume,echo){if(!audio||!soundOn||audio.state!=='running')return;let len=Math.round(duration*audio.sampleRate),b=audio.createBuffer(1,len,audio.sampleRate),d=b.getChannelData(0);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);let source=audio.createBufferSource();source.buffer=b;let filter=audio.createBiquadFilter();filter.type=highpass?'highpass':'lowpass';filter.frequency.value=freq;let gain=audio.createGain();gain.gain.value=volume;source.connect(filter);filter.connect(gain);gain.connect(audio.destination);if(echo){let delay=audio.createDelay(.7),wet=audio.createGain();delay.delayTime.value=.19;wet.gain.value=.19;gain.connect(delay);delay.connect(wet);wet.connect(audio.destination);}source.start();source.stop(audio.currentTime+duration+.02)}
+function footstep(){noise(.09,false,490,.085,true)}
+function landing(v){noise(.18,false,240,clamp(v/850*.16,.05,.16),true)}
+function queueJump(){if(finished)return;unlock();p.jumpQueue=.13}
+function update(dt){if(finished)return;time+=dt;let dir=Number(keys.right)-Number(keys.left),prevX=p.x,prevY=p.y;let groundBefore=p.on;
+ if(p.on){let goal=dir*walk,speedup=dir&&Math.sign(p.vx)!==dir?acc*1.5:acc;p.vx+=clamp(goal-p.vx,-(dir?speedup:brake)*dt,(dir?speedup:brake)*dt);if(Math.abs(p.vx)>9)p.facing=Math.sign(p.vx);else if(dir)p.facing=dir;
+ } // No mid-air steering. The horizontal speed comes from takeoff.
+ p.jumpQueue=Math.max(0,p.jumpQueue-dt);p.coyote=p.on?.09:Math.max(0,p.coyote-dt);
+ if(p.jumpQueue>0&&p.coyote>0&&!p.prep){p.prep=.105;p.jumpQueue=0;p.coyote=0;}
+ if(p.prep>0){p.prep-=dt;if(p.prep<=0){p.prep=0;p.on=false;p.vy=jump;p.y-=1;noise(.07,false,210,.065,false)}}
+ if(!p.on){p.vy=Math.min(850,p.vy+grav*dt);p.y+=p.vy*dt;}
+ p.x=clamp(p.x+p.vx*dt,14,WORLD);
+ if(!p.on&&p.vy>=0){for(const s of platforms){if(p.x>=s.x+6&&p.x<=s.x+s.w-6&&prevY<=s.y+1&&p.y>=s.y){let impact=p.vy;p.y=s.y;p.vy=0;p.on=true;p.shock=1;landing(impact);break;}}}
+ if(p.on){let s=surface(p.x);if(!s||Math.abs(s.y-p.y)>2){p.on=false;p.vy=0;}}
+ if(p.on&&Math.abs(p.vx)>9){p.stride+=Math.abs(p.x-prevX)/56*Math.PI*2;let foot=Math.floor(p.stride/Math.PI);if(foot!==p.lastFoot){p.lastFoot=foot;footstep();}}
+ p.shock=Math.max(0,p.shock-dt*4.5);
+ if(p.y>660){let spawn=p.x<920?130:p.x<1690?1020:p.x<2610?1780:2690,s=surface(spawn);p.x=spawn;p.y=s?s.y:438;p.vx=0;p.vy=0;p.on=true;p.stride=0;p.prep=0;p.shock=0;noise(.2,false,170,.075,true)}
+ if(p.x>END-85){hud.textContent='SECTOR 03 / THE RED DOOR';if(keys.use){finished=true;overlay.classList.add('on');noise(.5,false,240,.13,true);}}
+ if(Math.random()<dt*7)mist.push({x:p.x+400+(Math.random()-.5)*650,y:245+Math.random()*220,v:4+Math.random()*9,life:4+Math.random()*5});mist.forEach(m=>{m.x+=m.v*dt;m.life-=dt});mist=mist.filter(m=>m.life>0).slice(-100);
+}
+function backdrop(){fill(0,0,W,H,grad(0,H,[[0,'#242d31'],[.27,'#536066'],[.68,'#6e7675'],[1,'#222b2e']]));
+ let light=g.createRadialGradient(690-cam*.05,145,6,690-cam*.05,145,440);light.addColorStop(0,'#b4bcb189');light.addColorStop(.55,'#abb4ad2c');light.addColorStop(1,'#b4bcb100');g.fillStyle=light;g.fillRect(0,0,W,500);
+ g.save();g.translate(-cam*.13,0);for(let i=-2;i<17;i++){let x=i*178+74,h=90+(Math.sin(i*3.1)+1)*85;fill(x,334-h,95,h,'#4551579a');fill(x+17,320-h,8,28,'#4b565a');fill(x+66,290-h,3,50,'#505b5d');if(i%3===0){fill(x-22,320-h,132,7,'#4a565bc0');}}
+ g.restore();
+ fill(0,204,W,257,grad(204,461,[[0,'#acb7b100'],[.38,'#a4ada953'],[.73,'#abb0a86a'],[1,'#c1bcb000']]));
+ g.save();g.translate(-cam*.31,0);for(let i=-2;i<14;i++){let x=63+i*264;fill(x,90,34,355,'#293439b8');fill(x+6,85,225,15,'#2c383cb8');fill(x+218,95,22,336,'#2d363abc');fill(x+27,120,3,310,'#89939217');fill(x+228,115,2,286,'#939d9619');
+ if(i%2===0){stroke([[x+30,95],[x+240,236]],'#242f3270',8);stroke([[x+240,95],[x+30,236]],'#26323770',8);}}
+ for(let i=0;i<10;i++){let x=i*310-50;g.strokeStyle='#334044aa';g.lineWidth=2;g.beginPath();g.moveTo(x,100);g.bezierCurveTo(x+58,187,x+200,174,x+300,100);g.stroke()}
+ g.restore();
+ for(let j=0;j<3;j++){let x=((time*(2+j)*2+j*390)%(W+550))-300;glow(x,268+j*65,250,'#c4c6b71b')}
+}
+function architecture(){g.save();g.translate(-cam,0);
+ for(let i=-1;i<18;i++){let x=180+i*210;fill(x,198,24,260,'#20292bd9');fill(x-16,191,86,9,'#303c3e');fill(x+22,224,112,7,'#253033d4');fill(x+130,212,12,190,'#2a3437c9');if(i%2===0){stroke([[x+15,220],[x+137,335]],'#1d282abb',7);stroke([[x+137,220],[x+15,335]],'#1d282aa8',7)}}
+ // A few warning beacons; red is not the primary palette.
+ for(let i=0;i<6;i++){let x=318+i*565;fill(x,289,6,135,'#313c3c');fill(x-8,288,21,5,'#485652');fill(x,281,5,6,'#9b5c58');glow(x+2,283,33,'#af5b5537')}
+ g.restore();}
+function floor(){g.save();g.translate(-cam,0);for(const s of platforms){fill(s.x,s.y,s.w,600-s.y,'#182124');fill(s.x,s.y,s.w,5,'#67716e');fill(s.x,s.y+5,s.w,6,'#303c3c');for(let x=s.x+17;x<s.x+s.w;x+=93){fill(x,s.y+10,35,1,'#89928b3b');fill(x+61,s.y+10,2,55,'#303a3b');}fill(s.x,s.y+38,s.w,118,grad(s.y+38,s.y+156,[[0,'#1d262600'],[1,'#0d1415bb']]))}
+ for(let i=0;i<18;i++){let x=154+i*172;fill(x,356,4,75,'#343f40');fill(x,356,70,4,'#414b4b');fill(x+64,360,4,70,'#364143')}
+ g.restore();}
+function redDoor(){let x=END-cam;if(x< -120||x>W+130)return;glow(x,326,135,'#b8685a33');fill(x-55,216,110,228,'#182124');fill(x-44,229,88,213,'#485052');fill(x-31,242,62,200,'#293234');fill(x-16,249,31,190,'#161e20');fill(x-3,246,5,189,'#8e5451');fill(x-64,214,130,8,'#65706b');fill(x+20,343,6,6,'#afb1a2');fill(x-17,195,34,9,'#8e504d');glow(x,199,35,'#b96b634a');}
+function link(a,b,width,color){g.beginPath();g.lineWidth=width;g.lineCap='round';g.strokeStyle=color;g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke()}
+// Simple two-bone IK for believable forward knee bend and planted / swinging feet.
+function knee(a,b,L1,L2){let dx=b.x-a.x,dy=b.y-a.y,d=Math.max(.01,Math.hypot(dx,dy)),r=Math.min(d,L1+L2-.001),ux=dx/d,uy=dy/d,s=(L1*L1-L2*L2+r*r)/(2*r),h=Math.sqrt(Math.max(0,L1*L1-s*s));return{x:a.x+ux*s+uy*h,y:a.y+uy*s-ux*h};}
+function foot(phase,speed){let f=((phase%(Math.PI*2))+(Math.PI*2))%(Math.PI*2)/(Math.PI*2),stance=.6-speed*.13,reach=17+speed*11;if(f<stance){return {x:reach*(1-2*f/stance),y:-3,planted:true}}let u=(f-stance)/(1-stance),smooth=u*u*(3-2*u);return {x:-reach+2*reach*smooth,y:-3-17*Math.sin(u*Math.PI),planted:false};}
+function figure(){let x=p.x-cam,y=p.y;if(x< -100||x>W+100)return;
+ const speed=clamp(Math.abs(p.vx)/walk,0,1),moving=p.on&&speed>.05,compression=p.shock*6+(p.prep>0?6:0),bob=moving?1.35*Math.sin(p.stride*2):.25*Math.sin(time*2);
+ // Ground-projected contact shadow: never translate with a jumping character.
+ let s=surface(p.x);if(s&&p.y<=s.y+1){let height=Math.max(0,s.y-p.y),scale=clamp(1-height/205,.17,1);g.fillStyle='rgba(8,15,16,'+(clamp(.41-height/370,.09,.41))+')';g.beginPath();g.ellipse(x,s.y+3,(26+speed*6)*scale,4*scale,0,0,Math.PI*2);g.fill();}
+ g.save();g.translate(x,y+bob+compression);g.scale(p.facing,1);
+ const legDraw=(near)=>{let hip={x:near?4:-4,y:-66},phase=p.stride+(near?0:Math.PI),f=p.on?(moving?foot(phase,speed):{x:near?3:-3,y:-3}):(near?{x:10,y:-18}:{x:-14,y:-10});let k=knee(hip,f,33,36);link(hip,k,near?11:10,near?'#344044':'#202b2e');link(k,f,near?9:8,near?'#424d4e':'#293436');link({x:k.x-1,y:k.y+1},{x:f.x-1,y:f.y},2,near?'#738079':'#45534f');poly([[f.x-5,f.y-3],[f.x+7,f.y-4],[f.x+15,f.y],[f.x+13,f.y+3],[f.x-7,f.y+3]],near?'#152023':'#1b2528')};
+ legDraw(false);
+ // Waist & torso: shoulders directly beneath the short neck.
+ const lean=clamp(p.vx/walk*.045,-.045,.045),shift=lean*20;
+ poly([[-9,-109],[7+shift,-109],[15+shift,-92],[11,-64],[-10,-64],[-15,-87]],'#3f4949');
+ poly([[-9,-109],[-1,-107],[-3,-67],[-11,-65],[-15,-88]],'#75807a');
+ poly([[4+shift,-106],[12+shift,-102],[15,-91],[9,-66],[2,-68]],'#253135');
+ // High collar, but no long exposed neck.
+ poly([[-9,-113],[5,-113],[11,-104],[-8,-104]],'#68736f');
+ // Small head and short neck. Total figure height approximately 133 px.
+ fill(-1,-117,5,5,'#848b83');
+ poly([[-5,-129],[-1,-133],[5,-132],[8,-128],[8,-120],[4,-117],[-3,-117],[-6,-122]],'#9da29a');
+ poly([[-6,-129],[-2,-134],[5,-134],[9,-130],[7,-127],[-1,-127],[-6,-125]],'#1d282b');
+ // Far arm with counter-swing.
+ const swing=moving?Math.cos(p.stride)*speed*9:0;
+ link({x:-9,y:-103},{x:-13-swing*.4,y:-84},9,'#293538');link({x:-13-swing*.4,y:-84},{x:-8-swing,y:-70},7,'#394346');
+ legDraw(true);
+ // Strong, low gun-hand silhouette; an original heavy hand cannon shape.
+ link({x:10,y:-104},{x:13-swing*.25,y:-84},10,'#59635f');link({x:13-swing*.25,y:-84},{x:14,y:-67},8,'#53605c');
+ poly([[11,-71],[16,-74],[21,-70],[20,-62],[15,-60]],'#96978b');
+ poly([[15,-65],[21,-67],[25,-57],[39,-53],[40,-49],[29,-51],[27,-45],[22,-45]],'#10191d');
+ fill(25,-58,19,5,'#737c78');fill(27,-54,21,5,'#202b2d');fill(39,-54,8,3,'#909b94');
+ g.restore();}
+function haze(){fill(0,0,W,H,grad(0,H,[[0,'#12191e7f'],[.3,'#12191e00'],[.79,'#10181b00'],[1,'#0b1115a3']]));for(const m of mist){let x=m.x-cam;if(x>=-50&&x<W+50){glow(x,m.y,47,'#c2c7b10d');}}}
+function render(){let target=clamp(p.x-320,0,WORLD-W+35);cam+=clamp(target-cam,-Math.max(5,Math.abs(target-cam)*.12),Math.max(5,Math.abs(target-cam)*.12));backdrop();architecture();floor();redDoor();figure();haze();}
+function frame(stamp){if(!prev)prev=stamp;buffer+=Math.min(.05,(stamp-prev)/1000);prev=stamp;let n=0;while(buffer>=1/120&&n<7){update(1/120);buffer-=1/120;n++;}if(n===7)buffer=0;render();requestAnimationFrame(frame)}requestAnimationFrame(frame);
+function keyName(key){if(key==='arrowleft'||key==='a')return'left';if(key==='arrowright'||key==='d')return'right';if(key===' '||key==='w'||key==='arrowup')return'jump';if(key==='e'||key==='enter')return'use';return null}
+const held=new Set();window.addEventListener('keydown',e=>{let k=keyName(e.key.toLowerCase());if(!k)return;e.preventDefault();unlock();if(!held.has(e.code)&&k==='jump')queueJump();held.add(e.code);keys[k]=true});window.addEventListener('keyup',e=>{let k=keyName(e.key.toLowerCase());if(k){e.preventDefault();keys[k]=false;held.delete(e.code)}});
+function clear(){held.clear();Object.keys(keys).forEach(k=>keys[k]=false);document.querySelectorAll('[data-hold]').forEach(b=>b.classList.remove('pressed'));}window.addEventListener('blur',clear);document.addEventListener('visibilitychange',()=>{if(document.hidden)clear()});
+for(const b of document.querySelectorAll('[data-hold]')){let k=b.dataset.hold,off=()=>{keys[k]=false;b.classList.remove('pressed')};b.addEventListener('pointerdown',e=>{e.preventDefault();unlock();try{b.setPointerCapture(e.pointerId)}catch(err){};keys[k]=true;b.classList.add('pressed');if(k==='jump')queueJump()});['pointerup','pointercancel','lostpointercapture'].forEach(n=>b.addEventListener(n,off));}
+document.getElementById('again').addEventListener('click',reset);document.getElementById('sound').addEventListener('click',e=>{soundOn=!soundOn;e.currentTarget.textContent='音: '+(soundOn?'ON':'OFF');e.currentTarget.setAttribute('aria-pressed',String(soundOn));if(soundOn)unlock()});document.getElementById('full').addEventListener('click',()=>{if(document.fullscreenElement){document.exitFullscreen?.();return}stage.requestFullscreen?.().then(()=>screen.orientation?.lock?.('landscape').catch(()=>{})).catch(()=>{});});
+window.echoDebug={getState:()=>({x:p.x,y:p.y,vx:p.vx,vy:p.vy,on:p.on,shadowSurface:!!surface(p.x),finished}),reset};
+})();
+</script></body></html>
