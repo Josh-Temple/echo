@@ -1,0 +1,169 @@
+{
+  "status": "PASS",
+  "tested_at": "2026-10-23 JST",
+  "index_sha256": "1e65d8c857179d8f9d65695c17766a21f4bcb8607ac35af08820adcfb3e2bec1",
+  "environment": {
+    "browser": "Chromium 153, Playwright",
+    "desktop_viewport": [
+      1440,
+      960
+    ],
+    "mobile_viewports": [
+      [
+        390,
+        844
+      ],
+      [
+        360,
+        800
+      ],
+      [
+        844,
+        390
+      ]
+    ],
+    "mobile_is_emulated": true,
+    "gpu_mode": "disabled; software rendering",
+    "real_android_device_tested": false
+  },
+  "visual_review": {
+    "status": "PASS",
+    "screens": [
+      "desktop title",
+      "desktop play",
+      "desktop middle",
+      "desktop door",
+      "desktop pause",
+      "desktop ending",
+      "mobile portrait",
+      "mobile landscape",
+      "mobile landscape pause"
+    ],
+    "notes": "Japanese heading, select and title footer glyphs checked after font fallback correction."
+  },
+  "unverified": [
+    "Sustained frame rate on physical Android devices",
+    "Sound quality on physical devices",
+    "Platform-specific fullscreen and orientation APIs"
+  ],
+  "checks": [
+    "Background decoded and title visible",
+    "Start enters playable scene and hides title from keyboard",
+    "Keyboard accelerates to the right",
+    "Jump keeps takeoff direction despite reverse input",
+    "Lands back on the original platform",
+    "Pause freezes movement and opens settings",
+    "Quality and reduced ambient motion controls work",
+    "Resume closes modal",
+    "Traverses all three gaps to the red door",
+    "Door interaction prompt is visible",
+    "Door interaction completes the scene",
+    "Replay resets position and ending",
+    "Focus loss pauses safely",
+    "No external runtime requests",
+    "390px layout has no horizontal overflow",
+    "390px touch controls are visible",
+    "390px pointer cancellation stops movement",
+    "360px layout has no horizontal overflow",
+    "360px touch controls are visible",
+    "360px pointer cancellation stops movement",
+    "844px layout has no horizontal overflow",
+    "844px touch controls are visible",
+    "844px pointer cancellation stops movement",
+    "Landscape sound control is accessible in pause",
+    "System reduced motion disables ambient effects",
+    "No browser JavaScript errors"
+  ],
+  "errors": [],
+  "views": [
+    {
+      "width": 390,
+      "height": 844,
+      "state": {
+        "x": 255.96944444444483,
+        "y": 438,
+        "vx": 0,
+        "vy": 0,
+        "on": true,
+        "shadowSurface": true,
+        "finished": false,
+        "started": true,
+        "paused": false,
+        "cam": 114.42563331818884,
+        "width": 432,
+        "height": 540,
+        "renderScale": 2,
+        "qualityScale": 2,
+        "motionOn": true,
+        "drawMs": 0.5,
+        "assetReady": true
+      }
+    },
+    {
+      "width": 360,
+      "height": 800,
+      "state": {
+        "x": 254.0111111111115,
+        "y": 438,
+        "vx": 0,
+        "vy": 0,
+        "on": true,
+        "shadowSurface": true,
+        "finished": false,
+        "started": true,
+        "paused": false,
+        "cam": 111.69378446329111,
+        "width": 432,
+        "height": 540,
+        "renderScale": 2,
+        "qualityScale": 2,
+        "motionOn": true,
+        "drawMs": 0.5,
+        "assetReady": true
+      }
+    },
+    {
+      "width": 844,
+      "height": 390,
+      "state": {
+        "x": 263.8027777777782,
+        "y": 438,
+        "vx": 0,
+        "vy": 0,
+        "on": true,
+        "shadowSurface": true,
+        "finished": false,
+        "started": true,
+        "paused": false,
+        "cam": 0,
+        "width": 1168.6153846153845,
+        "height": 540,
+        "renderScale": 2,
+        "qualityScale": 2,
+        "motionOn": true,
+        "drawMs": 1,
+        "assetReady": true
+      }
+    }
+  ],
+  "middleCaptured": true,
+  "route": [
+    {
+      "gap": 1,
+      "takeoffX": 800.6000000000037
+    },
+    {
+      "gap": 2,
+      "takeoffX": 1576.0999999999867
+    },
+    {
+      "gap": 3,
+      "takeoffX": 2501.0694444444503
+    }
+  ],
+  "landings": [
+    1,
+    2,
+    3
+  ]
+}
