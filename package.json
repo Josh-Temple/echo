@@ -1,0 +1,1 @@
+{"name":"echo","private":true,"type":"module","scripts":{"test":"node --test tests/simulation.test.js"}}
