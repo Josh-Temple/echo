@@ -1,0 +1,190 @@
+{
+  "date": "2026-10-23",
+  "baseline": "cf5d571e274ebaec54ee3250870ba947d5c1747b",
+  "unit_tests": {
+    "passed": 7,
+    "failed": 0
+  },
+  "browser": {
+    "checks": [
+      {
+        "name": "desktop boot",
+        "pass": true
+      },
+      {
+        "name": "keyboard movement",
+        "pass": true
+      },
+      {
+        "name": "pause freezes simulation",
+        "pass": true
+      },
+      {
+        "name": "first gap",
+        "pass": true
+      },
+      {
+        "name": "second gap",
+        "pass": true
+      },
+      {
+        "name": "short interaction press opens gate",
+        "pass": true
+      },
+      {
+        "name": "complete traversal reaches ending",
+        "pass": true
+      },
+      {
+        "name": "replay",
+        "pass": true
+      },
+      {
+        "name": "high quality render",
+        "pass": true
+      },
+      {
+        "name": "context loss feedback",
+        "pass": true
+      },
+      {
+        "name": "context restores to resumable play",
+        "pass": true
+      },
+      {
+        "name": "mobile 390x844 layout and targets",
+        "pass": true
+      },
+      {
+        "name": "mobile 390x844 simultaneous move and jump",
+        "pass": true
+      },
+      {
+        "name": "mobile 390x844 release clears movement",
+        "pass": true
+      },
+      {
+        "name": "mobile 390x844 medium render",
+        "pass": true
+      },
+      {
+        "name": "mobile 360x800 layout and targets",
+        "pass": true
+      },
+      {
+        "name": "mobile 360x800 simultaneous move and jump",
+        "pass": true
+      },
+      {
+        "name": "mobile 360x800 release clears movement",
+        "pass": true
+      },
+      {
+        "name": "mobile 360x800 medium render",
+        "pass": true
+      },
+      {
+        "name": "mobile 844x390 layout and targets",
+        "pass": true
+      },
+      {
+        "name": "mobile 844x390 simultaneous move and jump",
+        "pass": true
+      },
+      {
+        "name": "mobile 844x390 release clears movement",
+        "pass": true
+      },
+      {
+        "name": "mobile 844x390 medium render",
+        "pass": true
+      },
+      {
+        "name": "no JavaScript, shader or external request errors",
+        "pass": true
+      }
+    ],
+    "errors": [],
+    "externalRequests": [],
+    "pass": true
+  },
+  "standalone_controls": {
+    "fileProtocol": true,
+    "boot": true,
+    "movement": true,
+    "shortJumpPress": true,
+    "errors": [],
+    "externalRequests": [],
+    "state": {
+      "x": 8.274236111111096,
+      "y": 0,
+      "vx": 0,
+      "vy": 0,
+      "grounded": true,
+      "face": 1,
+      "phase": 24.037919601895776,
+      "time": 4.191666666666665,
+      "coyote": 0.09,
+      "jumpBuffer": 0,
+      "prevJump": false,
+      "checkpoint": 2,
+      "falls": 0,
+      "gate": 0,
+      "activated": false,
+      "ended": false,
+      "landed": 0,
+      "mode": "playing",
+      "tier": "high",
+      "quality": "auto",
+      "cameraX": 11.874050622216753,
+      "drawCalls": 73,
+      "triangles": 14506
+    }
+  },
+  "standalone_final": {
+    "boot": true,
+    "fileProtocol": true,
+    "errors": [],
+    "externalRequests": [],
+    "buttonTextFits": true,
+    "buttons": [
+      {
+        "text": "←",
+        "width": 49,
+        "scrollWidth": 49,
+        "fontSize": "23px"
+      },
+      {
+        "text": "→",
+        "width": 49,
+        "scrollWidth": 49,
+        "fontSize": "23px"
+      },
+      {
+        "text": "調べる",
+        "width": 49,
+        "scrollWidth": 49,
+        "fontSize": "11px"
+      },
+      {
+        "text": "跳ぶ",
+        "width": 49,
+        "scrollWidth": 49,
+        "fontSize": "11px"
+      }
+    ]
+  },
+  "runtime_sha256": {
+    "webgl-study.html": "119059e28a190f0b36201077c1da07f716c30f7c13e1d77cb024942c23da2b21",
+    "echo3d/style.css": "4f1f2c042a8080baf5799fbdcd82e07aa040b0bec1e02618b6a846777270df9f",
+    "echo3d/app.js": "61b32d15dbfda278c89f11d6e9c3eaaecb3985229d67e46b73cfa745ba784805",
+    "echo3d/environment.js": "635a2cc4da16c3a204bec4527ec6a383b2165c32ad48db7223ce2afda2907713",
+    "echo3d/character.js": "e47838476b5ff1c97d247a27a1f4601af72a2a29181a46542feeaf69ca2966d6",
+    "echo3d/simulation.js": "eea6654b06fa98bb021a7320ad695c28e2e70062cbc075fa3115d939921ed9ce",
+    "echo3d/audio.js": "beb35a0370f06a34a1b4dd1338c7fe9801628bad6137d1f1cb9d7c88e2b44a18"
+  },
+  "preview_sha256": "7d7aab34cdbdec2009c73313723ebe9fb2727ed949e3616bc36241852371c213",
+  "environment": "Chromium 134, headless software WebGL (SwiftShader). Real browser keyboard and CDP multitouch. Not physical Android.",
+  "visual_review": "Desktop high, context restoration, portrait 390x844 and landscape 844x390 screenshots reviewed. Landscape touch label wrapping corrected; final standalone layout checked again.",
+  "publication": "Local implementation only. Public push blocked by automatic approval review; no workaround or public update attempted."
+}
