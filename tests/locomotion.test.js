@@ -76,3 +76,40 @@ test('coat movement settles after the body stops instead of snapping',async()=>{
     for(let i=0;i<120;i++){step(s,{});character.update(s);}assert.ok(Math.abs(coat.rotation.z)<.001);
   } finally {globalThis.document=original;}
 });
+
+test('footfall rhythm is slower and the swing stays low without losing planted contact',()=>{
+  const s=createState(), gait=createLocomotion();s.x=10;let previous=gait.update(s,0);
+  let cycles=0, plantedFrames=0, swingingFrames=0;
+  for(let i=0;i<360;i++){
+    step(s,{right:true});
+    const feet=gait.update(s,0);
+    if(feet[0].cycle<previous[0].cycle)cycles++;
+    for(let j=0;j<2;j++){
+      if(feet[j].planted){plantedFrames++;assert.ok(Math.abs(feet[j].y-.006)<1e-8);}
+      else if(s.grounded){
+        swingingFrames++;
+        assert.ok(feet[j].y<=.115,'swing height stays modest');
+        assert.ok(feet[j].swingProgress>=0&&feet[j].swingProgress<=1);
+      }
+    }
+    previous=feet;
+  }
+  // The original visual phase multiplied physics phase by 1.15. At the
+  // same travel speed it completed at least one extra gait cycle here.
+  assert.ok(cycles>=5&&cycles<=6,`unexpected cadence: ${cycles}`);
+  assert.ok(plantedFrames>150&&swingingFrames>100);
+});
+
+test('shaped calves, ankle cuffs and toe caps remain part of both feet',async()=>{
+  const T=await import('../vendor/three-0.169.0.module.min.js');
+  const {createCharacter}=await import('../echo3d/character.js');
+  const original=globalThis.document;
+  globalThis.document={createElement:()=>({getContext:()=>({createRadialGradient:()=>({addColorStop(){}}),fillRect(){}})})};
+  try{
+    const character=createCharacter(new T.Scene());
+    for(const name of ['far thigh','near thigh','far shin','near shin'])
+      assert.equal(character.root.getObjectByName(name).geometry.type,'LatheGeometry');
+    for(const name of ['far toe cap','near toe cap','far boot cuff','near boot cuff'])
+      assert.ok(character.root.getObjectByName(name),`missing ${name}`);
+  }finally{globalThis.document=original;}
+});
