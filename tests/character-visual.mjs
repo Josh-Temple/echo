@@ -70,7 +70,7 @@ if(process.env.ECHO_ONLY_MOTION==='1'){
 const renderContext=await browser.newContext({viewport:{width:720,height:450}}),movie=await renderContext.newPage();
 await movie.goto(base+'/__character');await movie.waitForFunction(()=>window.qa);
 const encoder=spawn('ffmpeg',['-loglevel','error','-y','-f','image2pipe','-vcodec','png','-r','24','-i','pipe:0','-an','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',path.join(out,'motion-fixed-step.mp4')],{stdio:['pipe','ignore','inherit']});
-for(let frame=0;frame<96;frame++){await movie.evaluate(frame=>window.qa.motionFrame(frame),frame);const png=await movie.screenshot();if(!encoder.stdin.write(png))await once(encoder.stdin,'drain');}
+for(let frame=0;frame<96;frame++){const png=await movie.evaluate(frame=>{window.qa.motionFrame(frame);return document.querySelector('canvas').toDataURL('image/png').split(',')[1];},frame);if(!encoder.stdin.write(Buffer.from(png,'base64')))await once(encoder.stdin,'drain');}
 encoder.stdin.end();const [code]=await once(encoder,'close');if(code!==0)throw new Error('Video encoding failed: '+code);await renderContext.close();
 }
 await browser.close();await new Promise(r=>server.close(r));if(errors.length)throw new Error(errors.join('\n'));
