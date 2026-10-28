@@ -24,6 +24,7 @@ jobs:
           node-version: 22
       - run: npm install --no-save --no-package-lock playwright@1.62.1
       - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get install -y ffmpeg
       - run: npm test
       - run: python3 scripts/build-standalone.py /tmp/ECHO_3D_Preview.html
       - name: Capture baseline and branch under identical conditions
@@ -32,12 +33,14 @@ jobs:
           ECHO_ROOT=/tmp/echo-baseline ECHO_QA_DIR="$RUNNER_TEMP/character-qa/baseline" node tests/character-visual.mjs
           ECHO_QA_BANDS=1 ECHO_QA_DIR="$RUNNER_TEMP/character-qa/branch" node tests/character-visual.mjs
       - name: Upload comparison images
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: character-comparison
           path: ${{ runner.temp }}/character-qa
           retention-days: 30
       - name: Browser smoke tests
+        if: always()
         env:
           ECHO_QA_DIR: ${{ runner.temp }}/character-qa/smoke
         run: node tests/browser-smoke.mjs
