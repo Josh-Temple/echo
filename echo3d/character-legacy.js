@@ -4,19 +4,31 @@ import { groundAt, SPEED } from './simulation.js';
 // All coordinates are metres. The figure stands 1.84 m tall; the head is
 // roughly one eighth of that height. Geometry and motion stay independent of
 // the world, camera and game rules.
-export function createCharacter(scene) {
+export function createCharacter(scene, options = {}) {
   const root = new T.Group();
   root.name = 'ECHO protagonist';
   scene.add(root);
 
-  const fabric = new T.MeshStandardMaterial({ color: 0x39433f, roughness: 1 });
-  const fabricDark = new T.MeshStandardMaterial({ color: 0x2b3432, roughness: 1 });
-  const stitching = new T.MeshStandardMaterial({ color: 0x48524b, roughness: 1 });
-  const trousers = new T.MeshStandardMaterial({ color: 0x252d2d, roughness: 1 });
-  const boots = new T.MeshStandardMaterial({ color: 0x171d1d, roughness: .94 });
-  const skin = new T.MeshStandardMaterial({ color: 0x777d74, roughness: 1 });
-  const hair = new T.MeshStandardMaterial({ color: 0x252d2b, roughness: 1 });
-  const metal = new T.MeshStandardMaterial({ color: 0x242d2e, metalness: .32, roughness: .72 });
+  // Retain the exact original geometry and gait for side-by-side QA. A
+  // toon-only option makes the material change independently comparable.
+  const ramps = {2: [145, 255], 3: [120, 184, 255], 4: [112, 158, 206, 255]};
+  const bands = [2, 3, 4].includes(options.bands) ? options.bands : 3;
+  let ramp;
+  if (options.toon) {
+    ramp = new T.DataTexture(new Uint8Array(ramps[bands]), bands, 1, T.RedFormat);
+    ramp.minFilter = ramp.magFilter = T.NearestFilter; ramp.generateMipmaps = false; ramp.needsUpdate = true;
+  }
+  const material = settings => options.toon
+    ? new T.MeshToonMaterial({color:settings.color,gradientMap:ramp})
+    : new T.MeshStandardMaterial(settings);
+  const fabric = material({ color: 0x39433f, roughness: 1 });
+  const fabricDark = material({ color: 0x2b3432, roughness: 1 });
+  const stitching = material({ color: 0x48524b, roughness: 1 });
+  const trousers = material({ color: 0x252d2d, roughness: 1 });
+  const boots = material({ color: 0x171d1d, roughness: .94 });
+  const skin = material({ color: 0x777d74, roughness: 1 });
+  const hair = material({ color: 0x252d2b, roughness: 1 });
+  const metal = material({ color: 0x242d2e, metalness: .32, roughness: .72 });
   const sphere = new T.SphereGeometry(1, 14, 12);
   const axis = new T.Vector3(0, 1, 0);
   const start = new T.Vector3(), end = new T.Vector3();

@@ -7,7 +7,8 @@ import {createAudio} from './audio.js';
 
 const $=selector=>document.querySelector(selector),stage=$('#stage'),game=$('#game');
 const query=new URLSearchParams(location.search),debug=query.has('debug');
-const legacy=debug&&query.get('character')==='legacy',closeView=debug&&query.get('view')==='close';
+const variant=debug?query.get('character'):null;
+const legacy=variant==='legacy'||variant==='legacy-toon',closeView=debug&&query.get('view')==='close';
 const panels={intro:$('#intro'),paused:$('#menu'),ending:$('#ending'),error:$('#fallback')};
 const keys=new Set(),pointers=new Map(),queuedActions=new Set();
 const audio=createAudio(),clock=createClock();
@@ -45,12 +46,12 @@ async function boot(){
  try{
   renderer=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.shadowMap.enabled=true;
   stage.prepend(renderer.domElement);scene=new T.Scene();camera=new T.PerspectiveCamera(34,1,.1,180);camera.position.set(6,5.3,22);
-  environment=createEnvironment(renderer,scene);character=legacy?createLegacyCharacter(scene):createCharacter(scene,{bands:Number(query.get('bands')),outline:query.get('outline')!=='0'});setQuality(tier);new ResizeObserver(resize).observe(stage);
+  environment=createEnvironment(renderer,scene);character=legacy?createLegacyCharacter(scene,{toon:variant==='legacy-toon',bands:Number(query.get('bands'))}):createCharacter(scene,{bands:Number(query.get('bands')),outline:query.get('outline')!=='0'});setQuality(tier);new ResizeObserver(resize).observe(stage);
   renderer.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();lost=true;error('描画用の接続が切れました。復帰を待っています。');});
   renderer.domElement.addEventListener('webglcontextrestored',()=>{try{lost=false;environment.rebuildEnvironment();setQuality(tier);setMode('paused');notify('描画が復帰しました');}catch{error('描画を復帰できませんでした。再読み込みしてください。');}});
   character.update(state);camera.lookAt(6,2.3,-1);inspectCamera();environment.update(state,camera.position.x);renderer.render(scene,camera);
   $('#start').disabled=false;$('#start').textContent='歩きはじめる';setMode('intro');
-  if(debug)window.__echo={version:'toon-character-draft',snapshot:()=>({...state,mode,tier,quality:settings.quality,character:legacy?'legacy':'toon',cameraX:camera.position.x,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,feet:character.pose?.()}),context:()=>renderer.getContext()};
+  if(debug)window.__echo={version:'toon-character-draft',snapshot:()=>({...state,mode,tier,quality:settings.quality,character:legacy?variant:'toon',cameraX:camera.position.x,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,feet:character.pose?.()}),context:()=>renderer.getContext()};
   requestAnimationFrame(frame);
  }catch(e){console.error(e);error('この端末では3D描画を開始できませんでした。2D版も利用できます。');}
 }

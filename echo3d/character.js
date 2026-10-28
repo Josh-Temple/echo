@@ -20,7 +20,7 @@ export function createCharacter(scene, options = {}) {
   const material = color => new T.MeshToonMaterial({ color, gradientMap: ramp });
   const fabric = material(0x46514b), fabricDark = material(0x303a36);
   const stitching = material(0x566159), trousers = material(0x303939);
-  const boots = material(0x1e2726), skin = material(0x858c81);
+  const boots = material(0x1e2726), skin = material(0x6d786e);
   const hair = material(0x29322f), metal = material(0x303b3a);
   const outlineMaterial = new T.MeshBasicMaterial({ color: 0x1b2927, side: T.BackSide });
   const gait = createLocomotion();
@@ -43,6 +43,10 @@ export function createCharacter(scene, options = {}) {
   function outline(mesh, amount = 1.045) {
     if (options.outline === false) return mesh;
     const shell = new T.Mesh(mesh.geometry, outlineMaterial);
+    // Expand around each mesh's centre, not the body's ground-level origin.
+    // This prevents a large dark ridge above the shoulders.
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    mesh.geometry.boundingBox.getCenter(shell.position).multiplyScalar(1 - amount);
     shell.scale.setScalar(amount); shell.castShadow = false; shell.receiveShadow = false;
     mesh.add(shell);
     return mesh;
@@ -105,11 +109,6 @@ export function createCharacter(scene, options = {}) {
   ], fabric, body);
   jacket.name = 'tapered jacket';
   outline(jacket, 1.035);
-  const lapelShape = new T.Shape();
-  lapelShape.moveTo(.045, 1.46); lapelShape.lineTo(.14, 1.405);
-  lapelShape.lineTo(.105, 1.28); lapelShape.lineTo(.025, 1.405); lapelShape.closePath();
-  const lapel = addMesh(new T.ShapeGeometry(lapelShape), fabricDark, body);
-  lapel.position.z = .226; lapel.rotation.y = -.10;
   ellipsoid(trousers, [0, .995, 0], [.17, .095, .185], body);
   // The coat hem has a separate front and back flap. It trails slightly behind
   // the hips when moving, without adding a cloth simulation to the game loop.
@@ -185,10 +184,6 @@ export function createCharacter(scene, options = {}) {
     cuff: ellipsoid(fabricDark, [0, 0, z], [.048, .039, .05], body),
     hand: ellipsoid(skin, [0, 0, z], [.039, .057, .04], body),
   }));
-
-  // Only the camera-facing limbs receive hulls, limiting extra draw calls.
-  outline(legs[1].thigh, 1.055); outline(legs[1].shin, 1.055);
-  outline(arms[1].upper, 1.055); outline(arms[1].forearm, 1.055);
 
   const weapon = new T.Group();
   weapon.name = 'small carried sidearm';

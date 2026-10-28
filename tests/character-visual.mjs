@@ -18,7 +18,8 @@ const renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
 renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.shadowMap.enabled=true;
 renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);document.body.append(renderer.domElement);
 const params=new URLSearchParams(location.search);
-const scene=new T.Scene(),env=createEnvironment(renderer,scene),character=createCharacter(scene,{bands:Number(params.get('bands')),outline:params.get('outline')!=='0'}),camera=new T.PerspectiveCamera(34,innerWidth/innerHeight,.1,180);env.quality('low');
+const factory=params.get('mode')==='legacy-toon'?(await import('/echo3d/character-legacy.js')).createCharacter:createCharacter;
+const scene=new T.Scene(),env=createEnvironment(renderer,scene),character=factory(scene,{toon:params.get('mode')==='legacy-toon',bands:Number(params.get('bands')),outline:params.get('outline')!=='0'}),camera=new T.PerspectiveCamera(34,innerWidth/innerHeight,.1,180);env.quality('low');
 let state=createState();
 function pose(kind){state=createState();character.update(state);if(kind==='walk'){for(let i=0;i<155;i++){step(state,{right:true});character.update(state);}}if(kind==='jump'){for(let i=0;i<120;i++){step(state,{right:true});character.update(state);}for(let i=0;i<28;i++){step(state,{right:true,jump:i===0});character.update(state);}}return state;}
 function render(kind='idle',view='game'){pose(kind);character.update(state);if(view==='close'){camera.fov=28;camera.position.set(state.x+.1,state.y+1.48,6.1);camera.lookAt(state.x,state.y+.98,1.1);}else{camera.fov=34;camera.position.set(state.x+3.6,5.3,22);camera.lookAt(state.x+3.6,2.3,-1);}camera.updateProjectionMatrix();env.update(state,camera.position.x);renderer.info.autoReset=false;renderer.info.reset();renderer.render(scene,camera);return {state,drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,jsHeapBytes:performance.memory?.usedJSHeapSize??null};}
@@ -42,7 +43,7 @@ const errors=[];const page=await browser.newPage({viewport:{width:960,height:600
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 const started=Date.now();await page.goto(base+'/__character');await page.waitForFunction(()=>window.qa);const measurements={startupMilliseconds:Date.now()-started};
 for(const pose of ['idle','walk','jump'])for(const view of ['game','close']){measurements[`${pose}-${view}`]=await page.evaluate(({pose,view})=>window.qa.render(pose,view),{pose,view});await page.screenshot({path:path.join(out,`${pose}-${view}.png`)});}
-if(process.env.ECHO_QA_BANDS==='1')for(const [suffix,query] of [['two-bands','?bands=2'],['four-bands','?bands=4'],['no-outline','?outline=0']]){
+if(process.env.ECHO_QA_BANDS==='1')for(const [suffix,query] of [['two-bands','?bands=2'],['four-bands','?bands=4'],['no-outline','?outline=0'],['legacy-toon','?mode=legacy-toon']]){
  await page.goto(base+'/__character'+query);await page.waitForFunction(()=>window.qa);await page.evaluate(()=>window.qa.render('idle','close'));await page.screenshot({path:path.join(out,suffix+'.png')});
 }
 for(const [width,height] of [[390,844],[360,800],[844,390]]){await page.setViewportSize({width,height});await page.goto(base+'/webgl-study.html?debug=1');await page.waitForFunction(()=>window.__echo&&!document.querySelector('#start').disabled,{timeout:60000});await page.locator('#start').click();await page.screenshot({path:path.join(out,`game-${width}x${height}.png`)});}
