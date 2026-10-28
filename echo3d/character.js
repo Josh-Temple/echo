@@ -91,6 +91,16 @@ export function createCharacter(scene, options = {}) {
     return mesh;
   }
 
+  // Ring profiles give the upper leg and calf distinct silhouettes. The
+  // joint end is at local +Y because place() points +Y towards its end.
+  function shapedLeg(material, radius, depth, rings) {
+    const points = rings.map(([y, r]) => new T.Vector2(r, y));
+    const mesh = addMesh(new T.LatheGeometry(points, 12), material);
+    mesh.userData.radius = radius;
+    mesh.userData.depth = depth;
+    return mesh;
+  }
+
   function place(mesh, ax, ay, bx, by, z, endZ = z) {
     start.set(ax, ay, z);
     end.set(bx, by, endZ);
@@ -147,32 +157,49 @@ export function createCharacter(scene, options = {}) {
   addMesh(noseGeometry, skin, head);
 
   const shoeShape = new T.Shape();
-  shoeShape.moveTo(-.115, .012);
-  shoeShape.lineTo(-.108, .077);
-  shoeShape.lineTo(-.038, .119);
-  shoeShape.lineTo(.06, .104);
-  shoeShape.lineTo(.154, .055);
-  shoeShape.lineTo(.161, .018);
+  // Lower heel, shaped instep and a rounded toe read as footwear instead
+  // of a flat wedge when the camera follows the running character.
+  shoeShape.moveTo(-.125, .014);
+  shoeShape.lineTo(-.124, .059);
+  shoeShape.lineTo(-.088, .096);
+  shoeShape.lineTo(-.043, .121);
+  shoeShape.lineTo(.033, .114);
+  shoeShape.lineTo(.091, .079);
+  shoeShape.lineTo(.155, .057);
+  shoeShape.lineTo(.171, .041);
+  shoeShape.lineTo(.169, .019);
+  shoeShape.lineTo(.117, .013);
   shoeShape.closePath();
   const shoeGeometry = new T.ExtrudeGeometry(shoeShape, {
     depth: .112, bevelEnabled: true, bevelSegments: 1,
     bevelSize: .008, bevelThickness: .006, curveSegments: 2,
   });
   shoeGeometry.translate(0, 0, -.056);
-  const soleGeometry = new T.BoxGeometry(.282, .018, .122);
+  const soleGeometry = new T.BoxGeometry(.305, .018, .123);
   const legs = [-.115, .115].map((z, i) => {
-    const thigh = limb(trousers, .085, .091, .88);
-    const shin = limb(trousers, .061, .068, 1.16);
+    // Hip and upper calf carry volume; knees and ankles remain narrow.
+    const thigh = shapedLeg(trousers, .081, .088, [
+      [-.5, 1.13], [-.29, 1.12], [-.04, 1.01], [.25, .88], [.5, .82],
+    ]);
+    const shin = shapedLeg(trousers, .067, .074, [
+      [-.5, .93], [-.30, 1.12], [-.10, 1.06], [.14, .88], [.36, .72], [.5, .68],
+    ]);
     thigh.name = i === 0 ? 'far thigh' : 'near thigh';
     shin.name = i === 0 ? 'far shin' : 'near shin';
-    const knee = ellipsoid(trousers, [0, 0, z], [.075, .07, .079]);
-    const ankle = ellipsoid(boots, [0, 0, z], [.061, .07, .069]);
+    const knee = ellipsoid(trousers, [0, 0, z], [.069, .064, .074]);
+    const ankle = ellipsoid(boots, [0, 0, z], [.053, .062, .061]);
     const foot = new T.Group();
     foot.name = i === 0 ? 'far foot' : 'near foot';
     root.add(foot);
     outline(addMesh(shoeGeometry, boots, foot), 1.045);
     const sole = addMesh(soleGeometry, fabricDark, foot);
-    sole.position.set(.025, .014, 0);
+    sole.position.set(.022, .015, 0);
+    const heel = addMesh(new T.BoxGeometry(.067, .025, .113), boots, foot);
+    heel.position.set(-.096, .027, 0);
+    const toeCap = ellipsoid(fabricDark, [.126, .043, 0], [.045, .020, .055], foot);
+    toeCap.name = i === 0 ? 'far toe cap' : 'near toe cap';
+    const cuff = ellipsoid(fabricDark, [-.038, .128, 0], [.067, .027, .064], foot);
+    cuff.name = i === 0 ? 'far boot cuff' : 'near boot cuff';
     return { z, thigh, shin, knee, ankle, foot };
   });
 
@@ -228,7 +255,7 @@ export function createCharacter(scene, options = {}) {
     const motion = speed * (state.grounded ? 1 : .65);
     const phase = state.phase;
     const breathe = Math.sin(state.time * 1.7) * .004;
-    const bob = state.grounded ? Math.sin(phase * 2.3) * .011 * speed : 0;
+    const bob = state.grounded ? Math.sin(phase * 2) * .008 * speed : 0;
     const compression = state.landed * .085;
     const takeoff = !state.grounded ? Math.max(0, state.vy / JUMP_SPEED) * .025 : 0;
     let hip = .985 - .08 * speed + bob - compression - takeoff;
@@ -264,12 +291,16 @@ export function createCharacter(scene, options = {}) {
       leg.knee.position.set(kneeX, kneeY, kneeZ);
       leg.ankle.position.set(ankleX, ankleY, ankleZ);
       leg.foot.position.set(foot.x, foot.y, foot.z);
-      leg.foot.rotation.z = state.grounded ? 0 : (i === 0 ? -.10 : .06) * Math.min(1, Math.abs(state.vy) / 2);
+      // Lift the toe only during the airborne part of a grounded step.
+      // Keep the entire sole level while planted so it never cuts the floor.
+      leg.foot.rotation.z = state.grounded
+        ? (foot.planted ? 0 : .12 * Math.sin(Math.PI * foot.swingProgress))
+        : (i === 0 ? -.10 : .06) * Math.min(1, Math.abs(state.vy) / 2);
     }
 
     for (let i = 0; i < arms.length; i++) {
       const arm = arms[i];
-      const swing = Math.sin(phase * 1.15 + i * Math.PI) * .13 * motion;
+      const swing = Math.sin(phase + i * Math.PI) * .11 * motion;
       const air = airBlend;
       const falling = Math.max(0, -state.vy / JUMP_SPEED);
       const elbowX = arm.near ? -.035 - swing * .2 : -.015 + swing * .55 - .035 * air;
