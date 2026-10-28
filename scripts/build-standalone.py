@@ -10,7 +10,8 @@ output = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / 'ECHO_3D_P
 modules = [
     'vendor/three-0.169.0.module.min.js', 'vendor/Reflector.js',
     'vendor/RoomEnvironment.js', 'echo3d/simulation.js', 'echo3d/audio.js',
-    'echo3d/character.js', 'echo3d/environment.js', 'echo3d/app.js',
+    'echo3d/locomotion.js', 'echo3d/character-legacy.js', 'echo3d/character.js',
+    'echo3d/environment.js', 'echo3d/app.js',
 ]
 source = {name: (root / name).read_text() for name in modules}
 css = (root / 'echo3d/style.css').read_text().replace(

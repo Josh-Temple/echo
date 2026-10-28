@@ -31,6 +31,12 @@ jobs:
           git worktree add --detach /tmp/echo-baseline ed95c3c41c65ff502c1edb4ea1efb5e005e4606d
           ECHO_ROOT=/tmp/echo-baseline ECHO_QA_DIR="$RUNNER_TEMP/character-qa/baseline" node tests/character-visual.mjs
           ECHO_QA_DIR="$RUNNER_TEMP/character-qa/branch" node tests/character-visual.mjs
+      - name: Upload comparison images
+        uses: actions/upload-artifact@v4
+        with:
+          name: character-comparison
+          path: ${{ runner.temp }}/character-qa
+          retention-days: 30
       - name: Browser smoke tests
         env:
           ECHO_QA_DIR: ${{ runner.temp }}/character-qa/smoke
