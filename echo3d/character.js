@@ -24,7 +24,7 @@ export function createCharacter(scene, options = {}) {
   const hair = material(0x29322f), metal = material(0x303b3a);
   const outlineMaterial = new T.MeshBasicMaterial({ color: 0x1b2927, side: T.BackSide });
   const gait = createLocomotion();
-  let facing = null, lastTime = null, lastX = null;
+  let facing = null, lastTime = null, lastX = null, coatAngle = 0, airBlend = 0;
   let pose = [];
   const sphere = new T.SphereGeometry(1, 14, 12);
   const axis = new T.Vector3(0, 1, 0);
@@ -113,6 +113,7 @@ export function createCharacter(scene, options = {}) {
   // The coat hem has a separate front and back flap. It trails slightly behind
   // the hips when moving, without adding a cloth simulation to the game loop.
   const coatTail = new T.Group();
+  coatTail.name = 'coat hem';
   coatTail.position.y = .98;
   body.add(coatTail);
   loft([
@@ -215,7 +216,9 @@ export function createCharacter(scene, options = {}) {
     root.position.set(state.x, state.y, 1.1);
     const target = state.face === 1 ? 0 : Math.PI;
     const dt = lastTime === null ? 0 : Math.max(0, Math.min(.05, state.time - lastTime));
-    if (facing === null || state.time < lastTime || Math.abs(state.x - lastX) > 2) facing = target;
+    if (facing === null || state.time < lastTime || Math.abs(state.x - lastX) > 2) {
+      facing = target; coatAngle = 0; airBlend = state.grounded ? 0 : 1;
+    }
     const turn = Math.atan2(Math.sin(target - facing), Math.cos(target - facing));
     facing += turn * (1 - Math.exp(-10 * dt));
     root.rotation.y = facing;
@@ -240,7 +243,10 @@ export function createCharacter(scene, options = {}) {
 
     body.position.y = offset;
     body.rotation.z = state.grounded ? -.035 * speed : -.035 - .045 * state.vy / JUMP_SPEED;
-    coatTail.rotation.z = state.grounded ? .03 * speed : .03 - .025 * state.vy / JUMP_SPEED;
+    const coatTarget = state.grounded ? .03 * speed : .03 - .025 * state.vy / JUMP_SPEED;
+    coatAngle += (coatTarget - coatAngle) * (1 - Math.exp(-4 * dt));
+    coatTail.rotation.z = coatAngle;
+    airBlend += ((state.grounded ? 0 : 1) - airBlend) * (1 - Math.exp(-8 * dt));
     head.rotation.z = state.grounded ? .012 * speed - compression * .2 : .025 - .025 * state.vy / JUMP_SPEED;
 
     for (let i = 0; i < legs.length; i++) {
@@ -264,7 +270,7 @@ export function createCharacter(scene, options = {}) {
     for (let i = 0; i < arms.length; i++) {
       const arm = arms[i];
       const swing = Math.sin(phase * 1.15 + i * Math.PI) * .13 * motion;
-      const air = state.grounded ? 0 : 1;
+      const air = airBlend;
       const falling = Math.max(0, -state.vy / JUMP_SPEED);
       const elbowX = arm.near ? -.035 - swing * .2 : -.015 + swing * .55 - .035 * air;
       const wristX = arm.near ? .125 + swing * .25 : -.075 + swing - .055 * air;

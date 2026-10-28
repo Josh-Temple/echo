@@ -52,6 +52,7 @@ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-a
 const errors=[];const page=await browser.newPage({viewport:{width:960,height:600},deviceScaleFactor:1});
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 const started=Date.now();await page.goto(base+'/__character');await page.waitForFunction(()=>window.qa);const measurements={startupMilliseconds:Date.now()-started};
+if(process.env.ECHO_ONLY_MOTION!=='1'){
 for(const pose of ['idle','walk','jump'])for(const view of ['game','close']){measurements[`${pose}-${view}`]=await page.evaluate(({pose,view})=>window.qa.render(pose,view),{pose,view});await page.screenshot({path:path.join(out,`${pose}-${view}.png`)});}
 if(process.env.ECHO_QA_BANDS==='1')for(const [suffix,query] of [['two-bands','?bands=2'],['four-bands','?bands=4'],['no-outline','?outline=0'],['legacy-toon','?mode=legacy-toon']]){
  await page.goto(base+'/__character'+query);await page.waitForFunction(()=>window.qa);await page.evaluate(()=>window.qa.render('idle','close'));await page.screenshot({path:path.join(out,suffix+'.png')});
@@ -61,6 +62,9 @@ const videoContext=await browser.newContext({viewport:{width:960,height:600},rec
 const clip=await videoContext.newPage();clip.on('pageerror',e=>errors.push(e.message));clip.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 await clip.goto(base+'/__character');await clip.waitForFunction(()=>window.qa);measurements.motion=await clip.evaluate(()=>window.qa.animate());
 const video=clip.video();await videoContext.close();const recorded=await video.path();fs.renameSync(recorded,path.join(out,'motion-realtime.webm'));
+fs.writeFileSync(path.join(out,'measurements.json'),JSON.stringify({root,measurements,errors},null,2));
+}
+if(process.env.ECHO_ONLY_MOTION==='1'){
 // Render a fixed-step sequence separately: it shows the poses at normal speed
 // even when the software renderer is too slow for real-time video.
 const renderContext=await browser.newContext({viewport:{width:720,height:450}}),movie=await renderContext.newPage();
@@ -68,5 +72,5 @@ await movie.goto(base+'/__character');await movie.waitForFunction(()=>window.qa)
 const encoder=spawn('ffmpeg',['-loglevel','error','-y','-f','image2pipe','-vcodec','png','-r','24','-i','pipe:0','-an','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',path.join(out,'motion-fixed-step.mp4')],{stdio:['pipe','ignore','inherit']});
 for(let frame=0;frame<96;frame++){await movie.evaluate(frame=>window.qa.motionFrame(frame),frame);const png=await movie.screenshot();if(!encoder.stdin.write(png))await once(encoder.stdin,'drain');}
 encoder.stdin.end();const [code]=await once(encoder,'close');if(code!==0)throw new Error('Video encoding failed: '+code);await renderContext.close();
-fs.writeFileSync(path.join(out,'measurements.json'),JSON.stringify({root,measurements,errors},null,2));
+}
 await browser.close();await new Promise(r=>server.close(r));if(errors.length)throw new Error(errors.join('\n'));

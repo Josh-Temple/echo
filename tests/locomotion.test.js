@@ -62,3 +62,17 @@ test('jump shadow stays on the floor and weakens with height',async()=>{
     s.x=30;s.time=.2;character.update(s);assert.equal(shadow.visible,false);
   } finally {globalThis.document=original;}
 });
+
+test('coat movement settles after the body stops instead of snapping',async()=>{
+  const T=await import('../vendor/three-0.169.0.module.min.js');
+  const {createCharacter}=await import('../echo3d/character.js');
+  const original=globalThis.document;
+  globalThis.document={createElement:()=>({getContext:()=>({createRadialGradient:()=>({addColorStop(){}}),fillRect(){}})})};
+  try {
+    const character=createCharacter(new T.Scene()),s=createState();s.x=10;character.update(s);
+    for(let i=0;i<120;i++){step(s,{right:true});character.update(s);}
+    const coat=character.root.getObjectByName('coat hem'),moving=coat.rotation.z;
+    s.vx=0;step(s,{});character.update(s);assert.ok(moving>.02);assert.ok(coat.rotation.z>moving*.9);
+    for(let i=0;i<120;i++){step(s,{});character.update(s);}assert.ok(Math.abs(coat.rotation.z)<.001);
+  } finally {globalThis.document=original;}
+});
