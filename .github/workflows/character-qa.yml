@@ -13,7 +13,7 @@ permissions:
   contents: read
 jobs:
   browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-save --no-package-lock playwright@1.52.0
+      - run: npm install --no-save --no-package-lock playwright@1.62.1
       - run: npx playwright install --with-deps chromium
       - run: npm test
       - run: python3 scripts/build-standalone.py /tmp/ECHO_3D_Preview.html
