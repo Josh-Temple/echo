@@ -3,6 +3,11 @@ import { SPEED, JUMP_SPEED } from './simulation.js';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const smooth = t => t * t * (3 - 2 * t);
 const SIDE = 1.1;
+// The game runs at a brisk pace; a longer step cycle and a low swing arc
+// reduce the visual impression of feet scrambling without changing physics.
+const CADENCE = 1.0;
+const STANCE_END = .52;
+const STEP_AHEAD = .385;
 
 // The simulation owns position and timing. This controller changes only the
 // visible pose: planted feet retain their world positions until lifted.
@@ -31,9 +36,10 @@ export function createLocomotion() {
     else airborneTime = 0;
 
     const result = feet.map((foot, i) => {
-      const cycle = ((s.phase * 1.15 / (Math.PI * 2) + i * .5) % 1 + 1) % 1;
-      const previousCycle = previous ? ((previous.phase * 1.15 / (Math.PI * 2) + i * .5) % 1 + 1) % 1 : cycle;
-      const wantsStance = cycle < .55;
+      const cycle = ((s.phase * CADENCE / (Math.PI * 2) + i * .5) % 1 + 1) % 1;
+      const previousCycle = previous ? ((previous.phase * CADENCE / (Math.PI * 2) + i * .5) % 1 + 1) % 1 : cycle;
+      const wantsStance = cycle < STANCE_END;
+      let swingProgress = 0;
       if (!s.grounded) {
         foot.planted = false; foot.forced = false;
         const rise = clamp(s.vy / JUMP_SPEED, -1, 1);
@@ -54,7 +60,7 @@ export function createLocomotion() {
           if (foot.y < .009 && Math.abs(foot.x - target.x) < .025) { foot.y = .006; foot.planted = true; }
         }
       } else {
-        const enteredStance = wantsStance && previousCycle >= .55;
+        const enteredStance = wantsStance && previousCycle >= STANCE_END;
         if (enteredStance && !foot.forced) {
           // Finish at the preceding swing position and freeze that position.
           foot.y = .006; foot.planted = true;
@@ -64,22 +70,23 @@ export function createLocomotion() {
         }
         // A start or reversal can enter a cycle halfway through a stance. Do
         // not stretch a leg indefinitely while waiting for the next phase.
-        if (wantsStance && foot.planted && Math.abs(foot.x - s.x) > .39) {
+        if (wantsStance && foot.planted && Math.abs(foot.x - s.x) > .49) {
           foot.startX = foot.x; foot.startZ = foot.worldZ; foot.planted = false; foot.forced = true; foot.progress = 0;
         }
         if (!foot.planted) {
-          const t = foot.forced ? (foot.progress = clamp(foot.progress + dt * (3 + 7 * speed), 0, 1)) : clamp((cycle - .55) / .45, 0, 1);
+          const t = foot.forced ? (foot.progress = clamp(foot.progress + dt * (2.8 + 4 * speed), 0, 1)) : clamp((cycle - STANCE_END) / (1 - STANCE_END), 0, 1);
+          swingProgress = t;
           const ease = smooth(t);
-          const target = world(direction * c * .34, foot.z);
+          const target = world(direction * c * STEP_AHEAD, foot.z);
           // Moving the target with the pelvis anticipates the next contact.
           foot.x = foot.startX + (target.x - foot.startX) * ease;
           foot.worldZ = foot.startZ + (target.z - foot.startZ) * ease;
-          foot.y = .006 + Math.sin(Math.PI * t) * .14 * Math.min(1, speed * 4);
+          foot.y = .006 + Math.sin(Math.PI * t) * .108 * Math.min(1, speed * 4);
           if (foot.forced && t >= 1) { foot.forced = false; foot.planted = true; foot.y = .006; }
         }
       }
       const p = local(foot.x, foot.worldZ);
-      return {x:p.x, y:foot.y, z:p.z, worldX:foot.x, worldZ:foot.worldZ, planted:foot.planted, cycle};
+      return {x:p.x, y:foot.y, z:p.z, worldX:foot.x, worldZ:foot.worldZ, planted:foot.planted, cycle, swingProgress};
     });
     previous = {x:s.x, time:s.time, phase:s.phase, grounded:s.grounded, falls:s.falls};
     return result;
