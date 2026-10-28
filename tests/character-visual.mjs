@@ -4,6 +4,8 @@ import {createRequire} from 'node:module';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import {spawn} from 'node:child_process';
+import {once} from 'node:events';
 const require=createRequire(import.meta.url);
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(process.env.ECHO_ROOT||process.cwd());
@@ -34,7 +36,15 @@ function animate(milliseconds=6500){
   if(elapsed>=milliseconds)resolve({fps:frames/(elapsed/1000),frames,seconds:elapsed/1000,glError:renderer.getContext().getError()});else requestAnimationFrame(frame);
  }requestAnimationFrame(frame);});
 }
-window.qa={render,animate};render();
+function motionFrame(frame){
+ if(frame===0){state=createState();character.update(state);}
+ const seconds=frame/24;
+ const input={right:seconds<2.5,left:seconds>=2.5&&seconds<3.6,jump:frame===24};
+ for(let i=0;i<5;i++){step(state,input,1/120);character.update(state);}
+ camera.fov=38;camera.position.set(state.x+.1,2.3,6.5);camera.lookAt(state.x,1.4,1.1);camera.updateProjectionMatrix();
+ env.update(state,camera.position.x);renderer.render(scene,camera);
+}
+window.qa={render,animate,motionFrame};render();
 </script>`;
 const server=http.createServer((req,res)=>{const url=new URL(req.url,'http://localhost');if(url.pathname==='/__character'){res.setHeader('content-type','text/html');return res.end(html);}const file=path.resolve(root,'.'+decodeURIComponent(url.pathname));if(!file.startsWith(root+path.sep)){res.writeHead(403);return res.end();}try{res.setHeader('content-type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.ttf')?'font/ttf':'text/html');res.end(fs.readFileSync(file));}catch{res.writeHead(404);res.end();}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
@@ -50,6 +60,13 @@ for(const [width,height] of [[390,844],[360,800],[844,390]]){await page.setViewp
 const videoContext=await browser.newContext({viewport:{width:960,height:600},recordVideo:{dir:out,size:{width:960,height:600}}});
 const clip=await videoContext.newPage();clip.on('pageerror',e=>errors.push(e.message));clip.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 await clip.goto(base+'/__character');await clip.waitForFunction(()=>window.qa);measurements.motion=await clip.evaluate(()=>window.qa.animate());
-const video=clip.video();await videoContext.close();const recorded=await video.path();fs.renameSync(recorded,path.join(out,'motion.webm'));
+const video=clip.video();await videoContext.close();const recorded=await video.path();fs.renameSync(recorded,path.join(out,'motion-realtime.webm'));
+// Render a fixed-step sequence separately: it shows the poses at normal speed
+// even when the software renderer is too slow for real-time video.
+const renderContext=await browser.newContext({viewport:{width:720,height:450}}),movie=await renderContext.newPage();
+await movie.goto(base+'/__character');await movie.waitForFunction(()=>window.qa);
+const encoder=spawn('ffmpeg',['-loglevel','error','-y','-f','image2pipe','-vcodec','png','-r','24','-i','pipe:0','-an','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',path.join(out,'motion-fixed-step.mp4')],{stdio:['pipe','ignore','inherit']});
+for(let frame=0;frame<96;frame++){await movie.evaluate(frame=>window.qa.motionFrame(frame),frame);const png=await movie.screenshot();if(!encoder.stdin.write(png))await once(encoder.stdin,'drain');}
+encoder.stdin.end();const [code]=await once(encoder,'close');if(code!==0)throw new Error('Video encoding failed: '+code);await renderContext.close();
 fs.writeFileSync(path.join(out,'measurements.json'),JSON.stringify({root,measurements,errors},null,2));
 await browser.close();await new Promise(r=>server.close(r));if(errors.length)throw new Error(errors.join('\n'));

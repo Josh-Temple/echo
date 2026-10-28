@@ -46,6 +46,12 @@ jobs:
         env:
           ECHO_QA_DIR: ${{ runner.temp }}/character-qa/standalone
         run: node tests/standalone-smoke.mjs
+      - name: Verify read-only commit preview
+        if: always()
+        env:
+          ECHO_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          ECHO_QA_DIR: ${{ runner.temp }}/character-qa/remote
+        run: node tests/remote-preview.mjs
       - name: Upload visual evidence
         if: always()
         uses: actions/upload-artifact@v4

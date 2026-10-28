@@ -32,8 +32,9 @@ switches are for QA and are also included in the offline export.
 
 `tests/character-visual.mjs` captures the original main commit and the current
 branch in the same scene, including normal, close and phone-sized views. The
-workflow also records short motion clips and renderer counters. Software WebGL
-results do not establish performance, thermal stability or touch behavior on a
+workflow also records short motion clips and renderer counters. The fixed-step
+24 fps video is assembled frame by frame and is not a real-time performance
+measurement. Software WebGL results do not establish performance, thermal stability or touch behavior on a
 physical Android device.
 
 ## Implementation choice
