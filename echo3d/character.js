@@ -1,22 +1,31 @@
 import * as T from '../vendor/three-0.169.0.module.min.js';
-import { groundAt, SPEED } from './simulation.js';
+import { groundAt, SPEED, JUMP_SPEED } from './simulation.js';
+import { createLocomotion } from './locomotion.js';
 
 // All coordinates are metres. The figure stands 1.84 m tall; the head is
 // roughly one eighth of that height. Geometry and motion stay independent of
 // the world, camera and game rules.
-export function createCharacter(scene) {
+export function createCharacter(scene, options = {}) {
   const root = new T.Group();
   root.name = 'ECHO protagonist';
   scene.add(root);
 
-  const fabric = new T.MeshStandardMaterial({ color: 0x39433f, roughness: 1 });
-  const fabricDark = new T.MeshStandardMaterial({ color: 0x2b3432, roughness: 1 });
-  const stitching = new T.MeshStandardMaterial({ color: 0x48524b, roughness: 1 });
-  const trousers = new T.MeshStandardMaterial({ color: 0x252d2d, roughness: 1 });
-  const boots = new T.MeshStandardMaterial({ color: 0x171d1d, roughness: .94 });
-  const skin = new T.MeshStandardMaterial({ color: 0x777d74, roughness: 1 });
-  const hair = new T.MeshStandardMaterial({ color: 0x252d2b, roughness: 1 });
-  const metal = new T.MeshStandardMaterial({ color: 0x242d2e, metalness: .32, roughness: .72 });
+  // A small nearest-filtered ramp keeps three stable bands on every device.
+  // Debug builds can compare two or four bands without any external assets.
+  const ramps = {2: [145, 255], 3: [120, 184, 255], 4: [112, 158, 206, 255]};
+  const bandCount = [2, 3, 4].includes(options.bands) ? options.bands : 3;
+  const ramp = new T.DataTexture(new Uint8Array(ramps[bandCount]), bandCount, 1, T.RedFormat);
+  ramp.minFilter = ramp.magFilter = T.NearestFilter;
+  ramp.generateMipmaps = false; ramp.needsUpdate = true;
+  const material = color => new T.MeshToonMaterial({ color, gradientMap: ramp });
+  const fabric = material(0x46514b), fabricDark = material(0x303a36);
+  const stitching = material(0x566159), trousers = material(0x303939);
+  const boots = material(0x1e2726), skin = material(0x6d786e);
+  const hair = material(0x29322f), metal = material(0x303b3a);
+  const outlineMaterial = new T.MeshBasicMaterial({ color: 0x1b2927, side: T.BackSide });
+  const gait = createLocomotion();
+  let facing = null, lastTime = null, lastX = null, coatAngle = 0, airBlend = 0;
+  let pose = [];
   const sphere = new T.SphereGeometry(1, 14, 12);
   const axis = new T.Vector3(0, 1, 0);
   const start = new T.Vector3(), end = new T.Vector3();
@@ -26,6 +35,20 @@ export function createCharacter(scene) {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     parent.add(mesh);
+    return mesh;
+  }
+
+  // Selective inverted hulls avoid a full-screen effect and dark seams on
+  // small internal details. Each hull follows its source mesh's transform.
+  function outline(mesh, amount = 1.045) {
+    if (options.outline === false) return mesh;
+    const shell = new T.Mesh(mesh.geometry, outlineMaterial);
+    // Expand around each mesh's centre, not the body's ground-level origin.
+    // This prevents a large dark ridge above the shoulders.
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    mesh.geometry.boundingBox.getCenter(shell.position).multiplyScalar(1 - amount);
+    shell.scale.setScalar(amount); shell.castShadow = false; shell.receiveShadow = false;
+    mesh.add(shell);
     return mesh;
   }
 
@@ -68,9 +91,19 @@ export function createCharacter(scene) {
     return mesh;
   }
 
-  function place(mesh, ax, ay, bx, by, z) {
+  // Ring profiles give the upper leg and calf distinct silhouettes. The
+  // joint end is at local +Y because place() points +Y towards its end.
+  function shapedLeg(material, radius, depth, rings) {
+    const points = rings.map(([y, r]) => new T.Vector2(r, y));
+    const mesh = addMesh(new T.LatheGeometry(points, 12), material);
+    mesh.userData.radius = radius;
+    mesh.userData.depth = depth;
+    return mesh;
+  }
+
+  function place(mesh, ax, ay, bx, by, z, endZ = z) {
     start.set(ax, ay, z);
-    end.set(bx, by, z);
+    end.set(bx, by, endZ);
     mesh.position.copy(start).add(end).multiplyScalar(.5);
     end.sub(start);
     mesh.scale.set(mesh.userData.radius, end.length(), mesh.userData.depth);
@@ -85,31 +118,37 @@ export function createCharacter(scene) {
     [1.49, .17, .205, .008], [1.545, .076, .09, .014],
   ], fabric, body);
   jacket.name = 'tapered jacket';
+  outline(jacket, 1.035);
   ellipsoid(trousers, [0, .995, 0], [.17, .095, .185], body);
   // The coat hem has a separate front and back flap. It trails slightly behind
   // the hips when moving, without adding a cloth simulation to the game loop.
-  const coatTail = loft([
-    [.86, .155, .18, -.035], [.94, .17, .20, -.015],
-    [.985, .16, .195, -.012],
-  ], fabricDark, body);
+  const coatTail = new T.Group();
+  coatTail.name = 'coat hem';
+  coatTail.position.y = .98;
+  body.add(coatTail);
+  loft([
+    [-.18, .17, .185, -.045], [-.09, .18, .20, -.025],
+    [.015, .16, .195, -.012],
+  ], fabricDark, coatTail);
   const collar = loft([[1.51, .10, .13], [1.58, .082, .10]], fabricDark, body);
   collar.name = 'open collar';
-  ellipsoid(skin, [.012, 1.592, 0], [.052, .068, .055], body);
+  ellipsoid(skin, [.012, 1.579, 0], [.055, .052, .058], body);
   ellipsoid(stitching, [.035, 1.525, .105], [.065, .02, .065], body);
   ellipsoid(stitching, [.035, 1.525, -.105], [.065, .02, .065], body);
 
   const head = new T.Group();
-  head.position.set(.025, 1.72, 0);
+  head.position.set(.025, 1.70, 0);
   body.add(head);
-  loft([
+  const face = loft([
     [-.114, .025, .037, .017], [-.085, .073, .071, .018],
     [-.034, .102, .089, .008], [.038, .107, .092, -.003],
     [.083, .085, .078, -.012], [.116, .021, .029, -.014],
   ], skin, head);
+  outline(face, 1.05);
   // A short hairline and barely raised nose are enough to read in profile.
   // The face remains anonymous at the game's actual camera distance.
-  loft([[.045, .116, .102, -.005], [.084, .097, .09, -.012],
-    [.124, .027, .037, -.014]], hair, head);
+  loft([[.058, .091, .088, -.022], [.087, .084, .079, -.018],
+    [.12, .025, .035, -.014]], hair, head);
   const nose = new T.Shape();
   nose.moveTo(.097, -.001); nose.lineTo(.117, -.019);
   nose.lineTo(.101, -.037); nose.closePath();
@@ -118,30 +157,49 @@ export function createCharacter(scene) {
   addMesh(noseGeometry, skin, head);
 
   const shoeShape = new T.Shape();
-  shoeShape.moveTo(-.115, .012);
-  shoeShape.lineTo(-.108, .077);
-  shoeShape.lineTo(-.038, .119);
-  shoeShape.lineTo(.06, .104);
-  shoeShape.lineTo(.154, .055);
-  shoeShape.lineTo(.161, .018);
+  // Lower heel, shaped instep and a rounded toe read as footwear instead
+  // of a flat wedge when the camera follows the running character.
+  shoeShape.moveTo(-.125, .014);
+  shoeShape.lineTo(-.124, .059);
+  shoeShape.lineTo(-.088, .096);
+  shoeShape.lineTo(-.043, .121);
+  shoeShape.lineTo(.033, .114);
+  shoeShape.lineTo(.091, .079);
+  shoeShape.lineTo(.155, .057);
+  shoeShape.lineTo(.171, .041);
+  shoeShape.lineTo(.169, .019);
+  shoeShape.lineTo(.117, .013);
   shoeShape.closePath();
   const shoeGeometry = new T.ExtrudeGeometry(shoeShape, {
     depth: .112, bevelEnabled: true, bevelSegments: 1,
     bevelSize: .008, bevelThickness: .006, curveSegments: 2,
   });
   shoeGeometry.translate(0, 0, -.056);
-  const soleGeometry = new T.BoxGeometry(.282, .018, .122);
+  const soleGeometry = new T.BoxGeometry(.305, .018, .123);
   const legs = [-.115, .115].map((z, i) => {
-    const thigh = limb(trousers, .085, .091, .88);
-    const shin = limb(trousers, .061, .068, 1.16);
-    const knee = ellipsoid(trousers, [0, 0, z], [.075, .07, .079]);
-    const ankle = ellipsoid(boots, [0, 0, z], [.061, .07, .069]);
+    // Hip and upper calf carry volume; knees and ankles remain narrow.
+    const thigh = shapedLeg(trousers, .081, .088, [
+      [-.5, 1.13], [-.29, 1.12], [-.04, 1.01], [.25, .88], [.5, .82],
+    ]);
+    const shin = shapedLeg(trousers, .067, .074, [
+      [-.5, .93], [-.30, 1.12], [-.10, 1.06], [.14, .88], [.36, .72], [.5, .68],
+    ]);
+    thigh.name = i === 0 ? 'far thigh' : 'near thigh';
+    shin.name = i === 0 ? 'far shin' : 'near shin';
+    const knee = ellipsoid(trousers, [0, 0, z], [.069, .064, .074]);
+    const ankle = ellipsoid(boots, [0, 0, z], [.053, .062, .061]);
     const foot = new T.Group();
     foot.name = i === 0 ? 'far foot' : 'near foot';
     root.add(foot);
-    addMesh(shoeGeometry, boots, foot);
+    outline(addMesh(shoeGeometry, boots, foot), 1.045);
     const sole = addMesh(soleGeometry, fabricDark, foot);
-    sole.position.set(.025, .014, 0);
+    sole.position.set(.022, .015, 0);
+    const heel = addMesh(new T.BoxGeometry(.067, .025, .113), boots, foot);
+    heel.position.set(-.096, .027, 0);
+    const toeCap = ellipsoid(fabricDark, [.126, .043, 0], [.045, .020, .055], foot);
+    toeCap.name = i === 0 ? 'far toe cap' : 'near toe cap';
+    const cuff = ellipsoid(fabricDark, [-.038, .128, 0], [.067, .027, .064], foot);
+    cuff.name = i === 0 ? 'far boot cuff' : 'near boot cuff';
     return { z, thigh, shin, knee, ankle, foot };
   });
 
@@ -158,11 +216,11 @@ export function createCharacter(scene) {
   const weapon = new T.Group();
   weapon.name = 'small carried sidearm';
   body.add(weapon);
-  const receiver = addMesh(new T.BoxGeometry(.17, .058, .058), metal, weapon);
-  receiver.position.set(.055, 0, 0);
-  const muzzle = addMesh(new T.BoxGeometry(.075, .038, .05), fabricDark, weapon);
-  muzzle.position.set(.172, -.005, 0);
-  const grip = addMesh(new T.BoxGeometry(.05, .11, .055), boots, weapon);
+  const receiver = outline(addMesh(new T.BoxGeometry(.205, .068, .064), metal, weapon), 1.06);
+  receiver.position.set(.060, 0, 0);
+  const muzzle = addMesh(new T.BoxGeometry(.08, .042, .054), fabricDark, weapon);
+  muzzle.position.set(.197, -.006, 0);
+  const grip = addMesh(new T.BoxGeometry(.055, .125, .06), boots, weapon);
   grip.position.set(-.016, -.063, 0);
   grip.rotation.z = -.17;
 
@@ -183,77 +241,72 @@ export function createCharacter(scene) {
 
   function update(state) {
     root.position.set(state.x, state.y, 1.1);
-    root.rotation.y = state.face === 1 ? 0 : Math.PI;
+    const target = state.face === 1 ? 0 : Math.PI;
+    const dt = lastTime === null ? 0 : Math.max(0, Math.min(.05, state.time - lastTime));
+    if (facing === null || state.time < lastTime || Math.abs(state.x - lastX) > 2) {
+      facing = target; coatAngle = 0; airBlend = state.grounded ? 0 : 1;
+    }
+    const turn = Math.atan2(Math.sin(target - facing), Math.cos(target - facing));
+    facing += turn * (1 - Math.exp(-10 * dt));
+    root.rotation.y = facing;
+    lastTime = state.time; lastX = state.x;
 
     const speed = Math.min(1, Math.abs(state.vx) / SPEED);
     const motion = speed * (state.grounded ? 1 : .65);
     const phase = state.phase;
     const breathe = Math.sin(state.time * 1.7) * .004;
-    const bob = state.grounded ? Math.sin(phase * 2) * .013 * speed : 0;
-    const compression = state.landed * .055;
-    const hip = .985 - .10 * speed + bob - compression;
+    const bob = state.grounded ? Math.sin(phase * 2) * .008 * speed : 0;
+    const compression = state.landed * .085;
+    const takeoff = !state.grounded ? Math.max(0, state.vy / JUMP_SPEED) * .025 : 0;
+    let hip = .985 - .08 * speed + bob - compression - takeoff;
+    pose = gait.update(state, facing);
+    // Let the pelvis settle when the feet are spread, keeping both leg
+    // segments within their natural reach rather than stretching the meshes.
+    if (state.grounded) for (let i = 0; i < legs.length; i++) {
+      const foot = pose[i], horizontal = Math.hypot(foot.x - .012, foot.z - legs[i].z);
+      hip = Math.min(hip, foot.y + .095 + Math.sqrt(Math.max(0, .885 * .885 - horizontal * horizontal)));
+    }
     const offset = hip - .985 + breathe;
 
     body.position.y = offset;
-    body.rotation.z = state.grounded ? -.038 * speed : -.085;
-    coatTail.rotation.z = state.grounded ? .035 * speed : .018;
-    head.rotation.z = state.grounded ? .012 * speed - compression * .2 : .055;
+    body.rotation.z = state.grounded ? -.035 * speed : -.035 - .045 * state.vy / JUMP_SPEED;
+    const coatTarget = state.grounded ? .03 * speed : .03 - .025 * state.vy / JUMP_SPEED;
+    coatAngle += (coatTarget - coatAngle) * (1 - Math.exp(-4 * dt));
+    coatTail.rotation.z = coatAngle;
+    airBlend += ((state.grounded ? 0 : 1) - airBlend) * (1 - Math.exp(-8 * dt));
+    head.rotation.z = state.grounded ? .012 * speed - compression * .2 : .025 - .025 * state.vy / JUMP_SPEED;
 
     for (let i = 0; i < legs.length; i++) {
-      const leg = legs[i];
-      const cycle = ((phase / (Math.PI * 2) + i * .5) % 1 + 1) % 1;
-      let footX, footY, toe = 0;
-
-      if (state.grounded) {
-        if (cycle < .62) {
-          const t = cycle / .62;
-          footX = .43 - .86 * t;
-          footY = .006;
-          toe = -Math.max(0, (t - .75) / .25) * .18;
-          footY += -toe * .19; // Lift the heel while the toe remains planted.
-        } else {
-          const t = (cycle - .62) / .38;
-          const ease = t * t * (3 - 2 * t);
-          footX = -.43 + .86 * ease;
-          footY = .006 + Math.sin(t * Math.PI) * .18;
-          toe = -.11 * Math.sin(t * Math.PI);
-        }
-        footX *= speed;
-        footY = .006 + (footY - .006) * speed;
-        toe *= speed;
-      } else {
-        // A leading bent knee and a trailing leg sell the jump without moving
-        // either foot by input while the simulation is airborne.
-        footX = i === 0 ? -.20 : .245;
-        footY = i === 0 ? .15 : .25;
-        toe = i === 0 ? -.13 : .08;
-      }
-
-      const ankleX = footX - .012;
-      const ankleY = footY + .095;
-      const dx = ankleX, dy = ankleY - hip;
-      const length = Math.hypot(dx, dy);
-      const reach = .445;
-      const distance = Math.min(length, reach * 1.999);
-      const bend = Math.sqrt(Math.max(0, reach * reach - distance * distance / 4));
-      const kneeX = ankleX / 2 - dy / (length || 1) * bend;
-      const kneeY = (hip + ankleY) / 2 + dx / (length || 1) * bend;
-
-      place(leg.thigh, 0, hip, kneeX, kneeY, leg.z);
-      place(leg.shin, kneeX, kneeY, ankleX, ankleY, leg.z);
-      leg.knee.position.set(kneeX, kneeY, leg.z);
-      leg.ankle.position.set(ankleX, ankleY, leg.z);
-      leg.foot.position.set(footX, footY, leg.z);
-      leg.foot.rotation.z = toe;
+      const leg = legs[i], foot = pose[i];
+      const ankleX = foot.x - .012, ankleY = foot.y + .095, ankleZ = foot.z;
+      const dx = ankleX, dy = ankleY - hip, dz = ankleZ - leg.z;
+      const distance = Math.min(Math.hypot(dx, dy, dz), .889);
+      const bend = Math.sqrt(Math.max(0, .445 * .445 - distance * distance / 4));
+      const planar = Math.hypot(dx, dy) || 1;
+      const kneeX = ankleX / 2 - dy / planar * bend;
+      const kneeY = (hip + ankleY) / 2 + dx / planar * bend;
+      const kneeZ = (leg.z + ankleZ) / 2;
+      place(leg.thigh, 0, hip, kneeX, kneeY, leg.z, kneeZ);
+      place(leg.shin, kneeX, kneeY, ankleX, ankleY, kneeZ, ankleZ);
+      leg.knee.position.set(kneeX, kneeY, kneeZ);
+      leg.ankle.position.set(ankleX, ankleY, ankleZ);
+      leg.foot.position.set(foot.x, foot.y, foot.z);
+      // Lift the toe only during the airborne part of a grounded step.
+      // Keep the entire sole level while planted so it never cuts the floor.
+      leg.foot.rotation.z = state.grounded
+        ? (foot.planted ? 0 : .12 * Math.sin(Math.PI * foot.swingProgress))
+        : (i === 0 ? -.10 : .06) * Math.min(1, Math.abs(state.vy) / 2);
     }
 
     for (let i = 0; i < arms.length; i++) {
       const arm = arms[i];
-      const swing = Math.sin(phase + i * Math.PI) * .13 * motion;
-      const elbowX = arm.near ? -.035 - swing * .2 : -.015 + swing * .55;
-      const wristX = arm.near ? .125 + swing * .25 : -.075 + swing;
-      const elbowY = arm.near ? 1.18 : 1.20;
-      const wristY = arm.near ? 1.025 : 1.005;
+      const swing = Math.sin(phase + i * Math.PI) * .11 * motion;
+      const air = airBlend;
+      const falling = Math.max(0, -state.vy / JUMP_SPEED);
+      const elbowX = arm.near ? -.035 - swing * .2 : -.015 + swing * .55 - .035 * air;
+      const wristX = arm.near ? .125 + swing * .25 : -.075 + swing - .055 * air;
+      const elbowY = (arm.near ? 1.18 : 1.20) + air * .025 * falling;
+      const wristY = (arm.near ? 1.025 : 1.005) + air * (.025 + .045 * falling);
       place(arm.upper, 0, 1.455, elbowX, elbowY, arm.z);
       place(arm.forearm, elbowX, elbowY, wristX, wristY, arm.z);
       arm.elbow.position.set(elbowX, elbowY, arm.z);
@@ -271,5 +324,5 @@ export function createCharacter(scene) {
     shadow.scale.setScalar(1 + Math.max(0, state.y) * .2);
   }
 
-  return { root, update };
+  return { root, update, pose: () => pose };
 }

@@ -19,10 +19,11 @@ async function boot(p){observe(p);await p.goto(base+'/webgl-study.html?debug=1')
 async function quality(p,value){await p.keyboard.press('Escape');await p.locator('#quality').selectOption(value);await p.locator('#resume').click();}
 try{
  if(process.env.ECHO_MOBILE_ONLY!=='1'){
-  const p=await browser.newPage({viewport:{width:960,height:600}});await boot(p);await p.screenshot({path:out+'/title.png'});record('desktop boot');await p.locator('#start').click();await quality(p,'low');await p.keyboard.down('KeyD');await p.waitForFunction(()=>window.__echo.snapshot().x>7);await p.keyboard.up('KeyD');record('keyboard movement');
+  const p=await browser.newPage({viewport:{width:640,height:400}});await boot(p);await p.screenshot({path:out+'/title.png'});record('desktop boot');await p.locator('#start').click();await quality(p,'low');await p.keyboard.down('KeyD');await p.waitForFunction(()=>window.__echo.snapshot().x>7);await p.keyboard.up('KeyD');record('keyboard movement');
+  const turnStart=(await snapshot(p)).x;await p.keyboard.down('KeyA');await p.waitForFunction(x=>window.__echo.snapshot().x<x-.4&&window.__echo.snapshot().face===-1,turnStart);await p.keyboard.up('KeyA');await p.waitForFunction(()=>Math.abs(window.__echo.snapshot().vx)<.01);record('keyboard reversal and stopping');
   await p.keyboard.press('Escape');const paused=(await snapshot(p)).x;await p.waitForTimeout(250);assert.equal((await snapshot(p)).x,paused);record('pause freezes simulation');await p.locator('#resume').click();
   await p.keyboard.down('KeyD');await p.waitForFunction(()=>window.__echo.snapshot().x>=28.45);await p.keyboard.press('Space');await p.waitForFunction(()=>window.__echo.snapshot().x>31.5&&window.__echo.snapshot().grounded);assert.equal((await snapshot(p)).falls,0);record('first gap');
-  await p.waitForFunction(()=>window.__echo.snapshot().x>=61.55);await p.keyboard.press('Space');await p.waitForFunction(()=>window.__echo.snapshot().x>65&&window.__echo.snapshot().grounded);assert.equal((await snapshot(p)).falls,0);record('second gap');
+  await p.waitForFunction(()=>window.__echo.snapshot().x>=61.40);await p.keyboard.press('Space');await p.waitForFunction(()=>window.__echo.snapshot().x>65&&window.__echo.snapshot().grounded);assert.equal((await snapshot(p)).falls,0);record('second gap');
   await p.waitForFunction(()=>window.__echo.snapshot().x>97.5);await p.keyboard.up('KeyD');await p.waitForFunction(()=>Math.abs(window.__echo.snapshot().vx)<.01);assert.match(await p.locator('#prompt').textContent(),/扉/);await p.keyboard.press('KeyE');await p.waitForFunction(()=>window.__echo.snapshot().activated);record('short interaction press opens gate');await p.waitForFunction(()=>window.__echo.snapshot().gate>=.99);await p.keyboard.down('KeyD');await p.waitForFunction(()=>window.__echo.snapshot().mode==='ending');await p.keyboard.up('KeyD');record('complete traversal reaches ending');await p.screenshot({path:out+'/ending.png'});
   await p.locator('#replay').click();assert.ok((await snapshot(p)).x<3);record('replay');await quality(p,'high');await p.screenshot({path:out+'/high.png'});record('high quality render');
   await p.evaluate(()=>{const ext=window.__echo.context().getExtension('WEBGL_lose_context');window.__restoreEcho=()=>ext.restoreContext();ext.loseContext();});await p.waitForFunction(()=>window.__echo.snapshot().mode==='error');record('context loss feedback');await p.evaluate(()=>window.__restoreEcho());await p.waitForFunction(()=>window.__echo.snapshot().mode==='paused');await p.locator('#resume').click();await p.screenshot({path:out+'/restored.png'});record('context restores to resumable play');await p.close();
@@ -36,6 +37,14 @@ try{
   // Inspect the intended visual tier too; low is used above only to stabilize input timing in software WebGL.
   await p.locator('#pause').click();await p.locator('#quality').selectOption('medium');await p.locator('#resume').click();await p.screenshot({path:out+`/mobile-${width}x${height}.png`});record(`mobile ${width}x${height} medium render`);await context.close();
  }
+ for(const variant of ['legacy','legacy-toon']){
+  const compare=await browser.newPage({viewport:{width:640,height:400}});observe(compare);
+  await compare.goto(base+`/webgl-study.html?debug=1&character=${variant}&view=close`);await compare.waitForFunction(()=>window.__echo&&!document.querySelector('#start').disabled);
+  const initial=await snapshot(compare);assert.equal(initial.character,variant);assert.ok(Math.abs(initial.cameraX-initial.x)<.2);
+  await compare.locator('#start').click();await compare.keyboard.down('KeyD');await compare.waitForFunction(()=>window.__echo.snapshot().x>2.5);await compare.keyboard.up('KeyD');
+  record(`${variant} comparison mode and close camera`);await compare.close();
+ }
+ const p2=await browser.newPage({viewport:{width:640,height:400}});observe(p2);await p2.goto(base+'/index.html');await p2.waitForFunction(()=>window.echoDebug);const x2=await p2.evaluate(()=>window.echoDebug.getState().x);await p2.keyboard.down('ArrowRight');await p2.waitForFunction(x=>window.echoDebug.getState().x>x+1,x2);await p2.keyboard.up('ArrowRight');await p2.screenshot({path:out+'/2d.png'});record('2D version starts and accepts movement');await p2.close();
  assert.deepEqual(results.errors,[]);assert.deepEqual(results.externalRequests,[]);record('no JavaScript, shader or external request errors');results.pass=true;
-}catch(error){results.pass=false;results.failure=String(error.stack||error);console.error(error);process.exitCode=1;}
+}catch(error){results.pass=false;results.failure=String(error.stack||error);try{const pages=browser.contexts().flatMap(c=>c.pages());if(pages.length&&await pages[0].evaluate(()=>!!window.__echo))results.failureState=await snapshot(pages[0]);}catch{}console.error(error);process.exitCode=1;}
 finally{fs.writeFileSync(out+'/browser-results.json',JSON.stringify(results,null,2));await browser.close();await new Promise(r=>server.close(r));}

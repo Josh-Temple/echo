@@ -1,0 +1,90 @@
+name: Character visual QA
+on:
+  push:
+    branches: ['visual/toon-character-motion']
+  pull_request:
+    paths:
+      - 'echo3d/**'
+      - 'webgl-study.html'
+      - 'tests/**'
+      - 'scripts/build-standalone.py'
+      - '.github/workflows/character-qa.yml'
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --no-package-lock playwright@1.62.1
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - run: python3 scripts/build-standalone.py /tmp/ECHO_3D_Preview.html
+      - name: Capture baseline and branch under identical conditions
+        run: |
+          git worktree add --detach /tmp/echo-baseline ed95c3c41c65ff502c1edb4ea1efb5e005e4606d
+          ECHO_ROOT=/tmp/echo-baseline ECHO_QA_DIR="$RUNNER_TEMP/character-qa/baseline" node tests/character-visual.mjs
+          ECHO_QA_BANDS=1 ECHO_QA_DIR="$RUNNER_TEMP/character-qa/branch" node tests/character-visual.mjs
+      - name: Upload comparison images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: character-comparison
+          path: ${{ runner.temp }}/character-qa
+          retention-days: 30
+      - name: Browser smoke tests
+        if: always()
+        env:
+          ECHO_QA_DIR: ${{ runner.temp }}/character-qa/smoke
+        run: node tests/browser-smoke.mjs
+      - name: Standalone offline smoke test
+        if: always()
+        env:
+          ECHO_QA_DIR: ${{ runner.temp }}/character-qa/standalone
+        run: node tests/standalone-smoke.mjs
+      - name: Verify read-only commit preview
+        if: always()
+        env:
+          ECHO_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          ECHO_QA_DIR: ${{ runner.temp }}/character-qa/remote
+        run: node tests/remote-preview.mjs
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: character-qa
+          path: ${{ runner.temp }}/character-qa
+          if-no-files-found: warn
+          retention-days: 30
+  motion:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --no-package-lock playwright@1.62.1
+      - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get install -y ffmpeg
+      - name: Render fixed-step comparison clips
+        run: |
+          git worktree add --detach /tmp/echo-baseline ed95c3c41c65ff502c1edb4ea1efb5e005e4606d
+          ECHO_ONLY_MOTION=1 ECHO_ROOT=/tmp/echo-baseline ECHO_QA_DIR="$RUNNER_TEMP/character-motion/baseline" node tests/character-visual.mjs
+          ECHO_ONLY_MOTION=1 ECHO_QA_DIR="$RUNNER_TEMP/character-motion/branch" node tests/character-visual.mjs
+      - name: Upload motion clips
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: character-motion
+          path: ${{ runner.temp }}/character-motion
+          if-no-files-found: warn
+          retention-days: 30
