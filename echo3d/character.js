@@ -163,6 +163,8 @@ export function createCharacter(scene, options = {}) {
   const legs = [-.115, .115].map((z, i) => {
     const thigh = limb(trousers, .085, .091, .88);
     const shin = limb(trousers, .061, .068, 1.16);
+    thigh.name = i === 0 ? 'far thigh' : 'near thigh';
+    shin.name = i === 0 ? 'far shin' : 'near shin';
     const knee = ellipsoid(trousers, [0, 0, z], [.075, .07, .079]);
     const ankle = ellipsoid(boots, [0, 0, z], [.061, .07, .069]);
     const foot = new T.Group();
@@ -231,14 +233,20 @@ export function createCharacter(scene, options = {}) {
     const bob = state.grounded ? Math.sin(phase * 2.3) * .011 * speed : 0;
     const compression = state.landed * .085;
     const takeoff = !state.grounded ? Math.max(0, state.vy / JUMP_SPEED) * .025 : 0;
-    const hip = .985 - .08 * speed + bob - compression - takeoff;
+    let hip = .985 - .08 * speed + bob - compression - takeoff;
+    pose = gait.update(state, facing);
+    // Let the pelvis settle when the feet are spread, keeping both leg
+    // segments within their natural reach rather than stretching the meshes.
+    if (state.grounded) for (let i = 0; i < legs.length; i++) {
+      const foot = pose[i], horizontal = Math.hypot(foot.x - .012, foot.z - legs[i].z);
+      hip = Math.min(hip, foot.y + .095 + Math.sqrt(Math.max(0, .885 * .885 - horizontal * horizontal)));
+    }
     const offset = hip - .985 + breathe;
 
     body.position.y = offset;
     body.rotation.z = state.grounded ? -.035 * speed : -.035 - .045 * state.vy / JUMP_SPEED;
     coatTail.rotation.z = state.grounded ? .03 * speed : .03 - .025 * state.vy / JUMP_SPEED;
     head.rotation.z = state.grounded ? .012 * speed - compression * .2 : .025 - .025 * state.vy / JUMP_SPEED;
-    pose = gait.update(state, facing);
 
     for (let i = 0; i < legs.length; i++) {
       const leg = legs[i], foot = pose[i];

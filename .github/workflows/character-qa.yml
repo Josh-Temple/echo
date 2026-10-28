@@ -30,7 +30,7 @@ jobs:
         run: |
           git worktree add --detach /tmp/echo-baseline ed95c3c41c65ff502c1edb4ea1efb5e005e4606d
           ECHO_ROOT=/tmp/echo-baseline ECHO_QA_DIR="$RUNNER_TEMP/character-qa/baseline" node tests/character-visual.mjs
-          ECHO_QA_DIR="$RUNNER_TEMP/character-qa/branch" node tests/character-visual.mjs
+          ECHO_QA_BANDS=1 ECHO_QA_DIR="$RUNNER_TEMP/character-qa/branch" node tests/character-visual.mjs
       - name: Upload comparison images
         uses: actions/upload-artifact@v4
         with:
@@ -41,6 +41,11 @@ jobs:
         env:
           ECHO_QA_DIR: ${{ runner.temp }}/character-qa/smoke
         run: node tests/browser-smoke.mjs
+      - name: Standalone offline smoke test
+        if: always()
+        env:
+          ECHO_QA_DIR: ${{ runner.temp }}/character-qa/standalone
+        run: node tests/standalone-smoke.mjs
       - name: Upload visual evidence
         if: always()
         uses: actions/upload-artifact@v4

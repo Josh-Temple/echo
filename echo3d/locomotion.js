@@ -64,7 +64,7 @@ export function createLocomotion() {
         }
         // A start or reversal can enter a cycle halfway through a stance. Do
         // not stretch a leg indefinitely while waiting for the next phase.
-        if (wantsStance && foot.planted && Math.abs(foot.x - s.x) > .48 && feet[1-i].planted) {
+        if (wantsStance && foot.planted && Math.abs(foot.x - s.x) > .39) {
           foot.startX = foot.x; foot.startZ = foot.worldZ; foot.planted = false; foot.forced = true; foot.progress = 0;
         }
         if (!foot.planted) {
