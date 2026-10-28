@@ -47,3 +47,18 @@ test('visible legs retain their lengths and shoes do not cross the floor',async(
     }
   } finally {globalThis.document=original;}
 });
+
+test('jump shadow stays on the floor and weakens with height',async()=>{
+  const T=await import('../vendor/three-0.169.0.module.min.js');
+  const {createCharacter}=await import('../echo3d/character.js');
+  const original=globalThis.document;
+  globalThis.document={createElement:()=>({getContext:()=>({createRadialGradient:()=>({addColorStop(){}}),fillRect(){}})})};
+  try {
+    const scene=new T.Scene(),character=createCharacter(scene),s=createState();s.x=10;character.update(s);
+    const shadow=scene.children.find(o=>o.isMesh&&o.geometry.type==='PlaneGeometry');
+    assert.ok(shadow);const opacity=shadow.material.opacity,scale=shadow.scale.x;
+    Object.assign(s,{y:1,vy:2,grounded:false,time:.1});character.update(s);
+    assert.equal(shadow.position.y,.012);assert.ok(shadow.material.opacity<opacity);assert.ok(shadow.scale.x>scale);
+    s.x=30;s.time=.2;character.update(s);assert.equal(shadow.visible,false);
+  } finally {globalThis.document=original;}
+});

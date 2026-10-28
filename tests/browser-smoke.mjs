@@ -20,6 +20,7 @@ async function quality(p,value){await p.keyboard.press('Escape');await p.locator
 try{
  if(process.env.ECHO_MOBILE_ONLY!=='1'){
   const p=await browser.newPage({viewport:{width:640,height:400}});await boot(p);await p.screenshot({path:out+'/title.png'});record('desktop boot');await p.locator('#start').click();await quality(p,'low');await p.keyboard.down('KeyD');await p.waitForFunction(()=>window.__echo.snapshot().x>7);await p.keyboard.up('KeyD');record('keyboard movement');
+  const turnStart=(await snapshot(p)).x;await p.keyboard.down('KeyA');await p.waitForFunction(x=>window.__echo.snapshot().x<x-.4&&window.__echo.snapshot().face===-1,turnStart);await p.keyboard.up('KeyA');await p.waitForFunction(()=>Math.abs(window.__echo.snapshot().vx)<.01);record('keyboard reversal and stopping');
   await p.keyboard.press('Escape');const paused=(await snapshot(p)).x;await p.waitForTimeout(250);assert.equal((await snapshot(p)).x,paused);record('pause freezes simulation');await p.locator('#resume').click();
   await p.keyboard.down('KeyD');await p.waitForFunction(()=>window.__echo.snapshot().x>=28.45);await p.keyboard.press('Space');await p.waitForFunction(()=>window.__echo.snapshot().x>31.5&&window.__echo.snapshot().grounded);assert.equal((await snapshot(p)).falls,0);record('first gap');
   await p.waitForFunction(()=>window.__echo.snapshot().x>=61.40);await p.keyboard.press('Space');await p.waitForFunction(()=>window.__echo.snapshot().x>65&&window.__echo.snapshot().grounded);assert.equal((await snapshot(p)).falls,0);record('second gap');
