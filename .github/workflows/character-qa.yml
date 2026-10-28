@@ -1,0 +1,45 @@
+name: Character visual QA
+on:
+  push:
+    branches: ['visual/toon-character-motion']
+  pull_request:
+    paths:
+      - 'echo3d/**'
+      - 'webgl-study.html'
+      - 'tests/**'
+      - 'scripts/build-standalone.py'
+      - '.github/workflows/character-qa.yml'
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --no-package-lock playwright@1.52.0
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - run: python3 scripts/build-standalone.py /tmp/ECHO_3D_Preview.html
+      - name: Capture baseline and branch under identical conditions
+        run: |
+          git worktree add --detach /tmp/echo-baseline ed95c3c41c65ff502c1edb4ea1efb5e005e4606d
+          ECHO_ROOT=/tmp/echo-baseline ECHO_QA_DIR="$RUNNER_TEMP/character-qa/baseline" node tests/character-visual.mjs
+          ECHO_QA_DIR="$RUNNER_TEMP/character-qa/branch" node tests/character-visual.mjs
+      - name: Browser smoke tests
+        env:
+          ECHO_QA_DIR: ${{ runner.temp }}/character-qa/smoke
+        run: node tests/browser-smoke.mjs
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: character-qa
+          path: ${{ runner.temp }}/character-qa
+          if-no-files-found: warn
+          retention-days: 30
