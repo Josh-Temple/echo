@@ -37,6 +37,13 @@ try{
   // Inspect the intended visual tier too; low is used above only to stabilize input timing in software WebGL.
   await p.locator('#pause').click();await p.locator('#quality').selectOption('medium');await p.locator('#resume').click();await p.screenshot({path:out+`/mobile-${width}x${height}.png`});record(`mobile ${width}x${height} medium render`);await context.close();
  }
+ for(const variant of ['legacy','legacy-toon']){
+  const compare=await browser.newPage({viewport:{width:640,height:400}});observe(compare);
+  await compare.goto(base+`/webgl-study.html?debug=1&character=${variant}&view=close`);await compare.waitForFunction(()=>window.__echo&&!document.querySelector('#start').disabled);
+  const initial=await snapshot(compare);assert.equal(initial.character,variant);assert.ok(Math.abs(initial.cameraX-initial.x)<.2);
+  await compare.locator('#start').click();await compare.keyboard.down('KeyD');await compare.waitForFunction(()=>window.__echo.snapshot().x>2.5);await compare.keyboard.up('KeyD');
+  record(`${variant} comparison mode and close camera`);await compare.close();
+ }
  const p2=await browser.newPage({viewport:{width:640,height:400}});observe(p2);await p2.goto(base+'/index.html');await p2.waitForFunction(()=>window.echoDebug);const x2=await p2.evaluate(()=>window.echoDebug.getState().x);await p2.keyboard.down('ArrowRight');await p2.waitForFunction(x=>window.echoDebug.getState().x>x+1,x2);await p2.keyboard.up('ArrowRight');await p2.screenshot({path:out+'/2d.png'});record('2D version starts and accepts movement');await p2.close();
  assert.deepEqual(results.errors,[]);assert.deepEqual(results.externalRequests,[]);record('no JavaScript, shader or external request errors');results.pass=true;
 }catch(error){results.pass=false;results.failure=String(error.stack||error);try{const pages=browser.contexts().flatMap(c=>c.pages());if(pages.length&&await pages[0].evaluate(()=>!!window.__echo))results.failureState=await snapshot(pages[0]);}catch{}console.error(error);process.exitCode=1;}
