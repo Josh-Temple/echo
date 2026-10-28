@@ -15,6 +15,26 @@ past their intended lengths. The existing contact shadow stays on the floor.
 This is still a simplified procedural animation, not motion capture or a full
 physical character rig.
 
+## Footfall pacing and lower-leg shape (2026-10-28)
+
+The gait phase multiplier is reduced from 1.15 to 1.0 (roughly 13% fewer
+visual gait cycles over the same distance). Stance occupies 52% rather than
+55% of each cycle, while each foot aims slightly farther ahead. The swing
+arc drops from 0.14 m to 0.108 m and emergency step recovery is eased.
+This keeps the planted-foot behavior and does **not** change simulation
+speed, jumping distance, gravity, or checkpoints. Arm swing and torso bob
+are synchronized with the slower visible leg cycle.
+
+A ring-shaped upper leg and calf now narrow toward knee and ankle; the shoes
+have a shaped instep and rounded toe, a separate heel, toe cap, ankle cuff,
+and modest toe lift only while swinging. Planted shoes remain level. These
+are procedural meshes, not authored skeletal animation; verify their
+silhouette at normal camera distance as well as in the close inspection view.
+
+Run `npm test`, then the character visual QA workflow. Its images and
+fixed-step clip support side-by-side review, but cannot by themselves
+establish Android device performance or subjective animation quality.
+
 ## Comparison controls
 
 Append `?debug=1` to `webgl-study.html` to expose these optional comparisons:
